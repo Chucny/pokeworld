@@ -50,7 +50,7 @@
       width: 100vw;
       height: 100vh;
       z-index: 100;
-      background: rgba(5, 5, 8, 0.85);
+      background: rgba(5, 5, 8, 0.88);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       display: flex;
@@ -213,8 +213,8 @@
 
   <div id="login-overlay">
     <div class="login-card">
-      <h1 class="brand-title">POKEWORLD</h1>
-      <p class="brand-subtitle">Login to access AR</p>
+      <h1 class="brand-title">POKEWORLD AR</h1>
+      <p class="brand-subtitle">Login to enter AR World</p>
 
       <div class="tab-group">
         <button class="tab-btn active" id="tab-login">Login</button>
@@ -241,13 +241,12 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
     import { getDatabase, ref, get, child, set, update, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
     // ==========================================
-    // 1. FIREBASE CONFIG & API FUNCTIONS [cite: 1, 2, 4, 5]
+    // 1. FIREBASE CONFIG & API
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyCcucgyr9Y8I7IIB7a-N5HjPXD7XDHiPLw",
@@ -261,7 +260,6 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
     const db = getDatabase(app);
 
     let currentUser = null;
@@ -307,7 +305,7 @@
     window.delete_account = delete_account;
 
     // ==========================================
-    // 2. THREE.JS SCENE & DYNAMIC OPTICAL CALIBRATION
+    // 2. THREE.JS & OPTICAL FOV CALIBRATION
     // ==========================================
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
@@ -329,7 +327,7 @@
 
     const gltfLoader = new GLTFLoader();
 
-    // Scale glb max dimension to exactly 1.0 meter [cite: 6]
+    // Scale GLB max dimension to exactly 1.0 meter
     function loadNormalizedGLTF(url, callback, fallbackUrl = '8.glb') {
       gltfLoader.load(
         url,
@@ -341,7 +339,7 @@
 
           const maxDim = Math.max(size.x, size.y, size.z);
           if (maxDim > 0) {
-            const scaleFactor = 1.0 / maxDim; // Exactly 1m scaling magic number [cite: 6]
+            const scaleFactor = 1.0 / maxDim; // 1m magic scale
             model.scale.set(scaleFactor, scaleFactor, scaleFactor);
           }
           callback(model);
@@ -355,9 +353,9 @@
     }
 
     // ==========================================
-    // 3. WEBCAM STREAM & OPTICAL FOV MATCHING
+    // 3. CAMERA FEED & PROJECTION MATCHING
     // ==========================================
-    let videoElement = document.getElementById('webcam');
+    const videoElement = document.getElementById('webcam');
 
     async function initWebcam() {
       try {
@@ -385,10 +383,8 @@
       let vHeight = videoElement.videoHeight || 720;
       let videoAspect = vWidth / vHeight;
 
-      // Adjust camera FOV so digital camera projection matches physical lens crop ratio
-      let defaultFov = 60; // Average smartphone rear lens FOV
+      let defaultFov = 60; // Standard smartphone primary lens FOV
       if (screenAspect < videoAspect) {
-        // Horizontal crop: Adjust FOV to maintain 1:1 scale with video
         let fovRad = 2 * Math.atan(Math.tan((defaultFov * Math.PI / 180) / 2) * (videoAspect / screenAspect));
         camera.fov = fovRad * (180 / Math.PI);
       } else {
@@ -401,7 +397,7 @@
     }
 
     // ==========================================
-    // 4. PRECISE GYROSCOPE & SENSOR TRANSFORM
+    // 4. ORIENTATION & GYRO TRANSFORM
     // ==========================================
     function requestDevicePermissions() {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -438,18 +434,17 @@
       deviceQuaternion.setFromEuler(euler);
       screenTransform.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -orient);
 
-      // Multiply transforms to align browser camera with world reference frame
       camera.quaternion.copy(deviceQuaternion);
       camera.quaternion.multiply(worldTransform);
       camera.quaternion.multiply(screenTransform);
     }
 
     // ==========================================
-    // 5. WALKING DETECTOR & GROUND SPAWNING 
+    // 5. STEP DETECTION & SPAWNING
     // ==========================================
     let activePokemon = null;
     let pokeballs = [];
-    const gravity = 9.81; // Gravity for pokeballs [cite: 9]
+    const gravity = 9.81;
 
     let lastSpawnTime = 0;
     let lastAccMag = 0;
@@ -459,14 +454,12 @@
       const acc = evt.acceleration || evt.accelerationIncludingGravity;
       if (!acc || acc.x === null) return;
 
-      const currentMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-      const deltaMag = Math.abs(currentMag - lastAccMag);
-      lastAccMag = currentMag;
+      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const delta = Math.abs(mag - lastAccMag);
+      lastAccMag = mag;
 
       const now = Date.now();
-
-      // Detect walking steps with 5-second cooldown 
-      if (deltaMag > 3.0 && (now - lastSpawnTime > 5000)) {
+      if (delta > 3.0 && (now - lastSpawnTime > 5000)) { // Step trigger
         lastSpawnTime = now;
         triggerRandomSpawn();
       }
@@ -474,7 +467,7 @@
 
     function triggerRandomSpawn() {
       const randomData = [
-        8, // Model 8.glb [cite: 3]
+        8, // Model 8.glb
         Math.floor(Math.random() * 50) + 1,
         Math.floor(Math.random() * 50) + 1,
         Math.floor(Math.random() * 50) + 1
@@ -492,20 +485,19 @@
         if (position) {
           targetPos.copy(position);
         } else {
-          // Calculate forward horizontal vector on ground plane
+          // Lock forward vector horizontally on ground plane
           const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-          forward.y = 0; // Lock to ground plane horizontal vector
+          forward.y = 0;
           if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
           forward.normalize();
 
-          // Spawn 2.2m ahead, exactly 1.4m below camera height 
+          // Spawn 2.2m ahead, 1.4m below eye level
           targetPos.copy(camera.position);
           targetPos.addScaledVector(forward, 2.2);
-          targetPos.y -= 1.4; // 1.4m below camera 
+          targetPos.y -= 1.4;
         }
 
         model.position.copy(targetPos);
-        // Face the player
         model.lookAt(camera.position.x, model.position.y, camera.position.z);
         scene.add(model);
 
@@ -518,11 +510,10 @@
     }
 
     // ==========================================
-    // 6. POKEBALL THROWING & CATCH MECHANICS [cite: 2, 6, 9]
+    // 6. POKEBALL PHYSICS & CATCH MECHANICS
     // ==========================================
     function throw_pokeball(forwardVel, upwardVel, rightVel) {
-      loadNormalizedGLTF('ball.glb', (ballMesh) => { // Uses ball.glb 
-        // Offset launch position to simulate hand origin
+      loadNormalizedGLTF('ball.glb', (ballMesh) => {
         const handOffset = new THREE.Vector3(0.15, -0.25, -0.4);
         handOffset.applyQuaternion(camera.quaternion);
         
@@ -530,7 +521,6 @@
         ballMesh.position.copy(startPos);
         scene.add(ballMesh);
 
-        // Convert camera launch vectors into world-space velocity
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
         const up = new THREE.Vector3(0, 1, 0);
@@ -557,7 +547,7 @@
       const targetBall = pokeballs[pokeballs.length - 1]?.mesh;
       let startTime = clock.getElapsedTime();
 
-      // Step 1: Vacuum shrink phase [cite: 2]
+      // Vacuum shrink
       const vacuumInterval = setInterval(() => {
         const elapsed = clock.getElapsedTime() - startTime;
         if (elapsed < 0.8) {
@@ -567,17 +557,16 @@
           clearInterval(vacuumInterval);
           scene.remove(pokemonMesh);
 
-          // Step 2: 3 shakes [cite: 2]
+          // 3 shakes
           if (targetBall) {
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
               targetBall.rotation.z += (shakeCount % 2 === 0 ? 0.3 : -0.3);
               shakeCount++;
-              if (shakeCount >= 6) { // 3 full back-and-forth shakes [cite: 2]
+              if (shakeCount >= 6) {
                 clearInterval(shakeInterval);
                 targetBall.rotation.z = 0;
 
-                // Step 3: Star burst & inventory add [cite: 2]
                 createStarBurst(targetBall.position);
                 inventory.push(data);
                 document.getElementById('caught-count').innerText = inventory.length;
@@ -623,7 +612,7 @@
       }, 30);
     }
 
-    // Touch gesture swipe throw listener [cite: 6]
+    // Touch gesture physics throw
     let touchStartY = 0;
     let touchStartX = 0;
 
@@ -637,12 +626,12 @@
       const deltaY = touchStartY - e.changedTouches[0].clientY;
       const deltaX = e.changedTouches[0].clientX - touchStartX;
 
-      if (deltaY > 35) { // Upward swipe [cite: 6]
+      if (deltaY > 35) {
         const forwardVel = Math.min(deltaY * 0.035, 11.0);
         const upwardVel = Math.min(deltaY * 0.018, 5.5);
         const rightVel = (deltaX / window.innerWidth) * 3.5;
 
-        throw_pokeball(forwardVel, upwardVel, rightVel); // [cite: 2]
+        throw_pokeball(forwardVel, upwardVel, rightVel);
       }
     });
 
@@ -664,7 +653,6 @@
         const ball = pokeballs[i];
         if (!ball.active) continue;
 
-        // Apply gravity trajectory [cite: 9]
         ball.velocity.y -= gravity * dt;
         ball.mesh.position.addScaledVector(ball.velocity, dt);
 
@@ -672,7 +660,7 @@
           const dist = ball.mesh.position.distanceTo(activePokemon.mesh.position);
           if (dist < 0.9) {
             ball.active = false;
-            catch_pokemon(activePokemon, activePokemon.data); // [cite: 2]
+            catch_pokemon(activePokemon, activePokemon.data);
           }
         }
 
@@ -689,7 +677,7 @@
     window.addEventListener('resize', calibrateCameraProjection);
 
     // ==========================================
-    // 8. AUTHENTICATION & DATABASE SYNC [cite: 1, 9]
+    // 8. AUTHENTICATION & DATABASE SYNC
     // ==========================================
     let authMode = 'login';
 
@@ -717,9 +705,9 @@
       statusEl.innerText = "Connecting...";
 
       try {
-        if (authMode === 'signup') await create_account(u, p); // [cite: 2]
+        if (authMode === 'signup') await create_account(u, p);
         
-        const invStr = await load_inventory(u, p); // [cite: 1]
+        const invStr = await load_inventory(u, p);
         inventory = JSON.parse(invStr);
         currentUser = u;
         currentPass = p;
@@ -729,13 +717,11 @@
         document.getElementById('user-display').innerText = u;
         document.getElementById('caught-count').innerText = inventory.length;
 
-        // Spawn initial Pokemon on entry
         setTimeout(() => triggerRandomSpawn(), 800);
 
-        // Sync whole inventory to Firebase every 15 seconds [cite: 1, 9]
         syncIntervalId = setInterval(() => {
           if (currentUser && currentPass) {
-            update_inventory(currentUser, currentPass, inventory); // [cite: 1, 9]
+            update_inventory(currentUser, currentPass, inventory);
           }
         }, 15000);
 
