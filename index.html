@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Pokeworld AR</title>
   <style>
     * {
@@ -23,10 +23,13 @@
 
     #webcam {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      top: 50%;
+      left: 50%;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      transform: translate(-50%, -50%);
       object-fit: cover;
       z-index: 0;
     }
@@ -287,11 +290,11 @@
 
     async function update_inventory(username, password, current_inventory) {
       const syncDot = document.getElementById('sync-dot');
-      syncDot.classList.add('syncing');
+      if (syncDot) syncDot.classList.add('syncing');
       await update(ref(db, `users/${username}`), {
         inventory: JSON.stringify(current_inventory)
       });
-      setTimeout(() => syncDot.classList.remove('syncing'), 500);
+      if (syncDot) setTimeout(() => syncDot.classList.remove('syncing'), 500);
     }
 
     // ==========================================
@@ -300,19 +303,20 @@
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
 
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // Camera FOV dynamically calibrated to match rear mobile lens (~60 deg)
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 500);
     camera.position.set(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    dirLight.position.set(5, 10, 5);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(2, 8, 4);
     scene.add(dirLight);
 
     const gltfLoader = new GLTFLoader();
@@ -328,32 +332,45 @@
 
           const maxDim = Math.max(size.x, size.y, size.z);
           if (maxDim > 0) {
-            const scaleFactor = 1.0 / maxDim;
+            const scaleFactor = 1.0 / maxDim; // Max dimension strictly set to 1 meter
             model.scale.set(scaleFactor, scaleFactor, scaleFactor);
           }
           callback(model);
         },
         undefined,
-        (err) => {
-          console.warn(`Could not load ${url}. Fallback to ${fallbackUrl}`);
+        () => {
           if (url !== fallbackUrl) loadNormalizedGLTF(fallbackUrl, callback, fallbackUrl);
         }
       );
     }
 
     // ==========================================
-    // 3. HARDWARE PERMISSIONS & ORIENTATION
+    // 3. HARDWARE CAMERA & CALIBRATION
     // ==========================================
     async function initWebcam() {
+      const video = document.getElementById('webcam');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false
         });
-        document.getElementById('webcam').srcObject = stream;
+        video.srcObject = stream;
+        
+        video.onloadedmetadata = () => {
+          video.play();
+          updateCameraProjection();
+        };
       } catch (e) {
-        console.warn("Camera streaming unavailable.", e);
+        console.warn("Camera stream blocked or unavailable.", e);
       }
+    }
+
+    function updateCameraProjection() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
     }
 
     function requestDevicePermissions() {
@@ -374,54 +391,63 @@
       }
     }
 
+    // Convert Gyro degrees into exact orientation quaternion
     const euler = new THREE.Euler();
-    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+    const orientationQuaternion = new THREE.Quaternion();
+    const screenTransform = new THREE.Quaternion();
+    const worldTransform = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 
     function handleOrientation(event) {
       if (event.alpha === null || event.beta === null) return;
-      const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
-      const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
-      const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
+
+      const alpha = THREE.MathUtils.degToRad(event.alpha || 0);
+      const beta = THREE.MathUtils.degToRad(event.beta || 0);
+      const gamma = THREE.MathUtils.degToRad(event.gamma || 0);
+      const orient = window.orientation ? THREE.MathUtils.degToRad(window.orientation) : 0;
 
       euler.set(beta, alpha, -gamma, 'YXZ');
-      camera.quaternion.setFromEuler(euler);
-      camera.quaternion.multiply(q1);
+      orientationQuaternion.setFromEuler(euler);
+      screenTransform.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -orient);
+
+      camera.quaternion.copy(orientationQuaternion);
+      camera.quaternion.multiply(worldTransform);
+      camera.quaternion.multiply(screenTransform);
     }
 
     // ==========================================
-    // 4. IMPROVED STEP DETECTION & AR SPAWNING
+    // 4. AR GAMEPLAY & WORLD-ANCHORED SPAWNING
     // ==========================================
     let activePokemon = null;
     let pokeballs = [];
     const gravity = 9.81;
-
     let lastSpawnTime = 0;
-    let lastAccMag = 0;
+    let lastAcc = 0;
 
     function handleMotion(evt) {
       if (!currentUser) return;
-      
       const acc = evt.acceleration || evt.accelerationIncludingGravity;
       if (!acc || acc.x === null) return;
 
-      const currentMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-      const deltaMag = Math.abs(currentMag - lastAccMag);
-      lastAccMag = currentMag;
+      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const delta = Math.abs(mag - lastAcc);
+      lastAcc = mag;
 
       const now = Date.now();
-
-      // Detect step impulses (delta magnitude check for walking)
-      if (deltaMag > 3.5 && (now - lastSpawnTime > 5000)) {
+      // Step detection threshold triggers spawn
+      if (delta > 2.8 && (now - lastSpawnTime > 5000)) {
         lastSpawnTime = now;
-        
-        const randomData = [
-          8,
-          Math.floor(Math.random() * 50) + 1,
-          Math.floor(Math.random() * 50) + 1,
-          Math.floor(Math.random() * 50) + 1
-        ];
-        spawn_pokemon(randomData);
+        triggerRandomSpawn();
       }
+    }
+
+    function triggerRandomSpawn() {
+      const randomData = [
+        8,
+        Math.floor(Math.random() * 50) + 1,
+        Math.floor(Math.random() * 50) + 1,
+        Math.floor(Math.random() * 50) + 1
+      ];
+      spawn_pokemon(randomData);
     }
 
     function spawn_pokemon(data, position) {
@@ -434,19 +460,18 @@
         if (position) {
           targetPos.copy(position);
         } else {
-          // Calculate world position 2.5m forward and 1.4m down along camera vector
+          // Project position 2.2m ahead and 1.4m down relative to world space orientation
           const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-          forward.y = 0; // Lock to floor plane horizontal direction
+          forward.y = 0; // Lock to horizontal floor plane
+          if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
           forward.normalize();
 
           targetPos.copy(camera.position);
-          targetPos.addScaledVector(forward, 2.5); // 2.5m out
-          targetPos.y -= 1.4; // 1.4m below camera level
+          targetPos.addScaledVector(forward, 2.2);
+          targetPos.y -= 1.4; // 1.4m below camera view
         }
 
         model.position.copy(targetPos);
-        
-        // Face the camera
         model.lookAt(camera.position.x, model.position.y, camera.position.z);
         scene.add(model);
 
@@ -459,19 +484,19 @@
     }
 
     // ==========================================
-    // 5. BALL THROWING (FIXED UNGLUED TRAJECTORY)
+    // 5. WORLD-SPACE POKEBALL THROWING
     // ==========================================
     function throw_pokeball(forwardVel, upwardVel, rightVel) {
       loadNormalizedGLTF('ball.glb', (ballMesh) => {
-        // Offset launch position down and right (held in hand view)
-        const spawnPos = new THREE.Vector3(0.2, -0.3, -0.5);
-        spawnPos.applyQuaternion(camera.quaternion);
-        spawnPos.add(camera.position);
-
-        ballMesh.position.copy(spawnPos);
+        // Position ball relative to hand origin in camera space
+        const launchOffset = new THREE.Vector3(0.15, -0.25, -0.4);
+        launchOffset.applyQuaternion(camera.quaternion);
+        
+        const startPos = new THREE.Vector3().copy(camera.position).add(launchOffset);
+        ballMesh.position.copy(startPos);
         scene.add(ballMesh);
 
-        // Compute direction in world space so movement isn't bound to camera frame
+        // Transform camera-relative direction vectors into fixed world-space velocity
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
         const up = new THREE.Vector3(0, 1, 0);
@@ -502,7 +527,7 @@
         const elapsed = clock.getElapsedTime() - startTime;
         if (elapsed < 0.8) {
           pokemonMesh.scale.multiplyScalar(0.85);
-          if (targetBall) pokemonMesh.position.lerp(targetBall.position, 0.2);
+          if (targetBall) pokemonMesh.position.lerp(targetBall.position, 0.25);
         } else {
           clearInterval(vacuumInterval);
           scene.remove(pokemonMesh);
@@ -510,14 +535,13 @@
           if (targetBall) {
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
-              targetBall.rotation.z += (shakeCount % 2 === 0 ? 0.3 : -0.3);
+              targetBall.rotation.z += (shakeCount % 2 === 0 ? 0.25 : -0.25);
               shakeCount++;
               if (shakeCount >= 6) {
                 clearInterval(shakeInterval);
                 targetBall.rotation.z = 0;
 
                 createStarBurst(targetBall.position);
-
                 inventory.push(data);
                 document.getElementById('caught-count').innerText = inventory.length;
 
@@ -526,19 +550,19 @@
                   activePokemon = null;
                 }, 1000);
               }
-            }, 300);
+            }, 250);
           }
         }
       }, 30);
     }
 
     function createStarBurst(pos) {
-      const pCount = 30;
+      const pCount = 35;
       const geometry = new THREE.BufferGeometry();
       const positions = [];
       for (let i = 0; i < pCount; i++) positions.push(pos.x, pos.y, pos.z);
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      const material = new THREE.PointsMaterial({ color: 0xffd700, size: 0.1 });
+      const material = new THREE.PointsMaterial({ color: 0x38bdf8, size: 0.08 });
       const pSystem = new THREE.Points(geometry, material);
       scene.add(pSystem);
 
@@ -549,9 +573,9 @@
         for (let i = 0; i < pCount; i++) {
           posAttr.setXYZ(
             i,
-            posAttr.getX(i) + (Math.random() - 0.5) * 0.1,
-            posAttr.getY(i) + (Math.random() - 0.5) * 0.1,
-            posAttr.getZ(i) + (Math.random() - 0.5) * 0.1
+            posAttr.getX(i) + (Math.random() - 0.5) * 0.08,
+            posAttr.getY(i) + (Math.random() - 0.5) * 0.08,
+            posAttr.getZ(i) + (Math.random() - 0.5) * 0.08
           );
         }
         posAttr.needsUpdate = true;
@@ -562,7 +586,7 @@
       }, 30);
     }
 
-    // Gesture control for throwing
+    // Touch gesture physics launcher
     let touchStartY = 0;
     let touchStartX = 0;
 
@@ -576,10 +600,10 @@
       const deltaY = touchStartY - e.changedTouches[0].clientY;
       const deltaX = e.changedTouches[0].clientX - touchStartX;
 
-      if (deltaY > 40) {
-        const forwardVel = Math.min(deltaY * 0.04, 12.0);
-        const upwardVel = Math.min(deltaY * 0.02, 6.0);
-        const rightVel = (deltaX / window.innerWidth) * 4.0;
+      if (deltaY > 35) {
+        const forwardVel = Math.min(deltaY * 0.035, 11.0);
+        const upwardVel = Math.min(deltaY * 0.018, 5.5);
+        const rightVel = (deltaX / window.innerWidth) * 3.5;
 
         throw_pokeball(forwardVel, upwardVel, rightVel);
       }
@@ -597,18 +621,19 @@
         const ball = pokeballs[i];
         if (!ball.active) continue;
 
+        // Apply real-world physics vectors in independent world space
         ball.velocity.y -= gravity * dt;
         ball.mesh.position.addScaledVector(ball.velocity, dt);
 
         if (activePokemon && !activePokemon.isCatching) {
           const dist = ball.mesh.position.distanceTo(activePokemon.mesh.position);
-          if (dist < 1.0) {
+          if (dist < 0.9) {
             ball.active = false;
             catch_pokemon(activePokemon, activePokemon.data);
           }
         }
 
-        if (clock.getElapsedTime() - ball.createdTime > 4.0) {
+        if (clock.getElapsedTime() - ball.createdTime > 3.5) {
           scene.remove(ball.mesh);
           pokeballs.splice(i, 1);
         }
@@ -617,14 +642,10 @@
     }
     animate();
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    window.addEventListener('resize', updateCameraProjection);
 
     // ==========================================
-    // 7. AUTH HANDLERS
+    // 7. AUTH & SYNC HANDLERS
     // ==========================================
     let authMode = 'login';
     function switchMode(mode) {
@@ -663,6 +684,10 @@
         document.getElementById('user-display').innerText = u;
         document.getElementById('caught-count').innerText = inventory.length;
 
+        // Immediate initial spawn when joining the world
+        setTimeout(() => triggerRandomSpawn(), 800);
+
+        // Background 15-second database sync
         syncIntervalId = setInterval(() => {
           if (currentUser && currentPass) {
             update_inventory(currentUser, currentPass, inventory);
