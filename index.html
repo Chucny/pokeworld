@@ -21,7 +21,6 @@
       -webkit-user-select: none;
     }
 
-    /* Video & Canvas Layers */
     #webcam {
       position: absolute;
       top: 0;
@@ -38,7 +37,7 @@
       width: 100vw;
       height: 100vh;
       z-index: 1;
-      pointer-events: none; /* Let touches pass through to document */
+      pointer-events: none;
     }
 
     /* Auth Overlay */
@@ -151,7 +150,7 @@
       right: 16px;
       z-index: 10;
       display: flex;
-      justify-content: space-between;
+      justify-space: space-between;
       align-items: center;
       pointer-events: none;
       opacity: 0;
@@ -192,7 +191,7 @@
       transition: background 0.3s ease;
     }
     .sync-indicator.syncing {
-      background: #fbbf24; /* Yellow when syncing */
+      background: #fbbf24;
     }
   </style>
 
@@ -241,12 +240,12 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
-    import { getDatabase, ref, get, child, set, update, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+    import { getDatabase, ref, get, child, set, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
     // ==========================================
-    // 1. FIREBASE CONFIG & API FUNCTIONS
+    // 1. FIREBASE CONFIG
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyCcucgyr9Y8I7IIB7a-N5HjPXD7XDHiPLw",
@@ -288,7 +287,7 @@
 
     async function update_inventory(username, password, current_inventory) {
       const syncDot = document.getElementById('sync-dot');
-      syncDot.classList.add('syncing'); // Visual feedback for sync
+      syncDot.classList.add('syncing');
       await update(ref(db, `users/${username}`), {
         inventory: JSON.stringify(current_inventory)
       });
@@ -310,7 +309,6 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
-    // Balanced Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     scene.add(ambientLight);
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -319,7 +317,6 @@
 
     const gltfLoader = new GLTFLoader();
 
-    // Scales any GLTF model to exactly 1 meter
     function loadNormalizedGLTF(url, callback, fallbackUrl = '8.glb') {
       gltfLoader.load(
         url,
@@ -331,7 +328,7 @@
 
           const maxDim = Math.max(size.x, size.y, size.z);
           if (maxDim > 0) {
-            const scaleFactor = 1.0 / maxDim; // Forces max dimension to be exactly 1m
+            const scaleFactor = 1.0 / maxDim;
             model.scale.set(scaleFactor, scaleFactor, scaleFactor);
           }
           callback(model);
@@ -345,7 +342,7 @@
     }
 
     // ==========================================
-    // 3. HARDWARE PERMISSIONS & WEBCAM
+    // 3. HARDWARE PERMISSIONS & ORIENTATION
     // ==========================================
     async function initWebcam() {
       try {
@@ -377,9 +374,8 @@
       }
     }
 
-    // Gyroscope to Camera Rotation
     const euler = new THREE.Euler();
-    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90 deg X-axis shift
+    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 
     function handleOrientation(event) {
       if (event.alpha === null || event.beta === null) return;
@@ -393,28 +389,33 @@
     }
 
     // ==========================================
-    // 4. AR GAMEPLAY (Spawning & Catching)
+    // 4. IMPROVED STEP DETECTION & AR SPAWNING
     // ==========================================
     let activePokemon = null;
     let pokeballs = [];
     const gravity = 9.81;
 
-    // Gyrometer Walking Detection
     let lastSpawnTime = 0;
+    let lastAccMag = 0;
+
     function handleMotion(evt) {
       if (!currentUser) return;
-      const acc = evt.accelerationIncludingGravity;
-      if (!acc) return;
+      
+      const acc = evt.acceleration || evt.accelerationIncludingGravity;
+      if (!acc || acc.x === null) return;
 
-      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const currentMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const deltaMag = Math.abs(currentMag - lastAccMag);
+      lastAccMag = currentMag;
+
       const now = Date.now();
 
-      // Look for walking magnitude (> 13.0) with 5-second cooldown
-      if (mag > 13.0 && (now - lastSpawnTime > 5000)) {
+      // Detect step impulses (delta magnitude check for walking)
+      if (deltaMag > 3.5 && (now - lastSpawnTime > 5000)) {
         lastSpawnTime = now;
         
         const randomData = [
-          8, // ID
+          8,
           Math.floor(Math.random() * 50) + 1,
           Math.floor(Math.random() * 50) + 1,
           Math.floor(Math.random() * 50) + 1
@@ -433,12 +434,20 @@
         if (position) {
           targetPos.copy(position);
         } else {
-          // Spawn exactly 1.4m below the camera view based on design doc
+          // Calculate world position 2.5m forward and 1.4m down along camera vector
+          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+          forward.y = 0; // Lock to floor plane horizontal direction
+          forward.normalize();
+
           targetPos.copy(camera.position);
-          targetPos.y -= 1.4;
+          targetPos.addScaledVector(forward, 2.5); // 2.5m out
+          targetPos.y -= 1.4; // 1.4m below camera level
         }
 
         model.position.copy(targetPos);
+        
+        // Face the camera
+        model.lookAt(camera.position.x, model.position.y, camera.position.z);
         scene.add(model);
 
         activePokemon = {
@@ -449,16 +458,28 @@
       });
     }
 
-    function throw_pokeball(direction) {
+    // ==========================================
+    // 5. BALL THROWING (FIXED UNGLUED TRAJECTORY)
+    // ==========================================
+    function throw_pokeball(forwardVel, upwardVel, rightVel) {
       loadNormalizedGLTF('ball.glb', (ballMesh) => {
-        const startPos = new THREE.Vector3();
-        camera.getWorldPosition(startPos);
-        ballMesh.position.copy(startPos);
+        // Offset launch position down and right (held in hand view)
+        const spawnPos = new THREE.Vector3(0.2, -0.3, -0.5);
+        spawnPos.applyQuaternion(camera.quaternion);
+        spawnPos.add(camera.position);
 
+        ballMesh.position.copy(spawnPos);
         scene.add(ballMesh);
 
-        const speed = 10.0;
-        const velocity = direction.clone().multiplyScalar(speed);
+        // Compute direction in world space so movement isn't bound to camera frame
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0);
+
+        const velocity = new THREE.Vector3()
+          .addScaledVector(forward, forwardVel)
+          .addScaledVector(right, rightVel)
+          .addScaledVector(up, upwardVel);
 
         pokeballs.push({
           mesh: ballMesh,
@@ -477,7 +498,6 @@
       const targetBall = pokeballs[pokeballs.length - 1]?.mesh;
       let startTime = clock.getElapsedTime();
 
-      // Vacuum shrink phase
       const vacuumInterval = setInterval(() => {
         const elapsed = clock.getElapsedTime() - startTime;
         if (elapsed < 0.8) {
@@ -487,7 +507,6 @@
           clearInterval(vacuumInterval);
           scene.remove(pokemonMesh);
 
-          // Shake phase
           if (targetBall) {
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
@@ -543,7 +562,7 @@
       }, 30);
     }
 
-    // Swipe Tracking
+    // Gesture control for throwing
     let touchStartY = 0;
     let touchStartX = 0;
 
@@ -557,27 +576,17 @@
       const deltaY = touchStartY - e.changedTouches[0].clientY;
       const deltaX = e.changedTouches[0].clientX - touchStartX;
 
-      // Swipe Up detection
-      if (deltaY > 50) {
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-        const up = new THREE.Vector3(0, 1, 0);
+      if (deltaY > 40) {
+        const forwardVel = Math.min(deltaY * 0.04, 12.0);
+        const upwardVel = Math.min(deltaY * 0.02, 6.0);
+        const rightVel = (deltaX / window.innerWidth) * 4.0;
 
-        const horizAngle = (deltaX / window.innerWidth) * 1.2;
-        const vertForce = (deltaY / window.innerHeight) * 1.5 + 0.3;
-
-        const throwDir = new THREE.Vector3()
-          .addScaledVector(forward, 1.0)
-          .addScaledVector(right, horizAngle)
-          .addScaledVector(up, vertForce)
-          .normalize();
-
-        throw_pokeball(throwDir);
+        throw_pokeball(forwardVel, upwardVel, rightVel);
       }
     });
 
     // ==========================================
-    // 5. ANIMATION LOOP
+    // 6. ANIMATION LOOP
     // ==========================================
     const clock = new THREE.Clock();
     function animate() {
@@ -615,7 +624,7 @@
     });
 
     // ==========================================
-    // 6. UI AUTH CONTROLS
+    // 7. AUTH HANDLERS
     // ==========================================
     let authMode = 'login';
     function switchMode(mode) {
@@ -627,7 +636,6 @@
     }
 
     async function handleSubmit() {
-      // Must request permissions inside user interaction handler
       requestDevicePermissions();
       await initWebcam();
 
@@ -655,7 +663,6 @@
         document.getElementById('user-display').innerText = u;
         document.getElementById('caught-count').innerText = inventory.length;
 
-        // 15 Second Database Sync Requirement
         syncIntervalId = setInterval(() => {
           if (currentUser && currentPass) {
             update_inventory(currentUser, currentPass, inventory);
