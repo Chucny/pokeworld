@@ -1,1 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Pokeworld AR</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      user-select: none;
+    }
+    #webcam {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: none;
+    }
+    #ui-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      max-width: 320px;
+      font-size: 12px;
+    }
+    #ui-overlay input, #ui-overlay button {
+      margin: 4px 0;
+      padding: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: none;
+    }
+    #ui-overlay button {
+      background-color: #ff4757;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 8px;
+      color: #7bed9f;
+    }
+  </style>
 
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+
+  <video id="webcam" autoplay playsinline muted></video>
+  <div id="canvas-container"></div>
+
+  <div id="ui-overlay">
+    <h3>Pokeworld Sync</h3>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="handleCreateAccount()">Create Account</button>
+    <button onclick="handleLogin()">Login / Sync</button>
+    <button onclick="handleDeleteAccount()" style="background-color: #2ed573;">Delete Account</button>
+    <div id="status">Status: Not connected</div>
+    <div id="inventory-display">Inventory: []</div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. FIREBASE CONFIGURATION & INITIALIZATION
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCcucgyr9Y8I7IIB7a-N5HjPXD7XDHiPLw",
+      authDomain: "pokeworld-game.firebaseapp.com",
+      databaseURL: "https://pokeworld-game-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "pokeworld-game",
+      storageBucket: "pokeworld-game.firebasestorage.app",
+      messagingSenderId: "543475382309",
+      appId: "1:543475382309:web:cdc049bd105202e3cd67cc",
+      measurementId: "G-0R7TZPLYGG"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentUser = null;
+    let currentPass = null;
+    let inventory = []; // Format: [[pokedex_id, move1, move2, move3], ...]
+
+    // --- Firebase Core Functions --- 
+    function create_account(username, password) { 
+      const userRef = db.ref('users/' + username);
+      return userRef.once('value').then(snapshot => {
+        if (snapshot.exists()) {
+          throw new Error("Username taken.");
+        }
+        if (!password || password.length < 4) {
+          throw new Error("Password invalid/too short.");
+        }
+        return userRef.set({
+          password: password,
+          inventory: JSON.stringify([])
+        });
+      });
+    }
+
+    function load_inventory(username, password) { [cite: 1]
+      return db.ref('users/' + username).once('value').then(snapshot => {
+        if (!snapshot.exists()) throw new Error("User does not exist.");
+        const data = snapshot.val();
+        if (data.password !== password) throw new Error("Incorrect password.");
+        return data.inventory || "[]";
+      });
+    }
+
+    function update_inventory(username, password, current_inventory) { [cite: 1]
+      return db.ref('users/' + username).update({
+        inventory: JSON.stringify(current_inventory)
+      });
+    }
+
+    function delete_account(username, password) { 
+      return load_inventory(username, password).then(() => {
+        return db.ref('users/' + username).remove();
+      });
+    }
+
+    // UI Wireups
+    function setStatus(msg) { document.getElementById('status').innerText = "Status: " + msg; }
+    function updateInventoryUI() { document.getElementById('inventory-display').innerText = "Inventory: " + JSON.stringify(inventory); }
+
+    function handleCreateAccount() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      create_account(u, p)
+        .then(() => { setStatus("Account created!"); currentUser = u; currentPass = p; })
+        .catch(err => setStatus(err.message));
+    }
+
+    function handleLogin() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      load_inventory(u, p)
+        .then(invStr => {
+          inventory = JSON.parse(invStr);
+          currentUser = u;
+          currentPass = p;
+          updateInventoryUI();
+          setStatus("Logged in & loaded.");
+        })
+        .catch(err => setStatus(err.message));
+    }
+
+    function handleDeleteAccount() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      delete_account(u, p)
+        .then(() => {
+          setStatus("Account deleted.");
+          currentUser = null; currentPass = null; inventory = [];
+          updateInventoryUI();
+        })
+        .catch(err => setStatus(err.message));
+    }
+
+    // 15-Second Background Sync Loop
+    setInterval(() => {
+      if (currentUser && currentPass) {
+        update_inventory(currentUser, currentPass, inventory)
+          .then(() => setStatus("Auto-synced inventory (" + new Date().toLocaleTimeString() + ")"))
+          .catch(err => setStatus("Sync error: " + err.message));
+      }
+    }, 15000);
+
+
+    // ==========================================
+    // 2. WEBCAM STREAM SETUP
+    // ==========================================
+    async function initWebcam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+        document.getElementById('webcam').srcObject = stream;
+      } catch (e) {
+        console.warn("Webcam access denied or unavailable.", e);
+      }
+    }
+    initWebcam();
+
+
+    // ==========================================
+    // 3. THREE.JS & AR RENDER ENGINE SETUP
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    const gltfLoader = new THREE.GLTFLoader();
+
+    // Model loader helper with 1.0m normalization
+    function loadNormalizedGLTF(url, callback) {
+      gltfLoader.load(
+        url,
+        (gltf) => {
+          const model = gltf.scene;
+          
+          // Calculate Bounding Box to find largest dimension
+          const box = new THREE.Box3().setFromObject(model);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+
+          const maxDim = Math.max(size.x, size.y, size.z);
+          if (maxDim > 0) {
+            const scaleFactor = 1.0 / maxDim; // Normalize max dimension exactly to 1.0 meter
+            model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+          }
+
+          callback(model);
+        },
+        undefined,
+        (err) => console.error("Error loading model: " + url, err)
+      );
+    }
+
+
+    // ==========================================
+    // 4. AR GAMEPLAY MECHANICS & AR FUNCTIONS
+    // ==========================================
+    let activePokemon = null;
+    let pokeballs = []; // Active thrown pokeballs
+    const gravity = 9.81;
+
+    // Spawn Pokemon function 
+    function spawn_pokemon(data, position) { 
+      const pokedexId = data[0];
+      const modelPath = `${pokedexId}.glb`; // e.g., 8.glb 
+
+      loadNormalizedGLTF(modelPath, (model) => {
+        if (activePokemon) scene.remove(activePokemon.mesh);
+
+        let targetPos = new THREE.Vector3();
+        if (position) {
+          targetPos.copy(position);
+        } else {
+          // 1.4m below camera, 2.5m directly in front
+          const forward = new THREE.Vector3(0, 0, -2.5).applyQuaternion(camera.quaternion);
+          targetPos.copy(camera.position).add(forward);
+          targetPos.y = camera.position.y - 1.4;
+        }
+
+        model.position.copy(targetPos);
+        scene.add(model);
+
+        activePokemon = {
+          mesh: model,
+          data: data
+        };
+      });
+    }
+
+    // Throw Pokeball function 
+    function throw_pokeball(direction) { 
+      loadNormalizedGLTF('ball.glb', (ballMesh) => {
+        ballMesh.position.copy(camera.position);
+        scene.add(ballMesh);
+
+        const velocity = direction.clone().multiplyScalar(8.0); // Velocity magnitude
+        velocity.y += 2.5; // Upward arc component
+
+        pokeballs.push({
+          mesh: ballMesh,
+          velocity: velocity,
+          active: true,
+          createdTime: clock.getElapsedTime()
+        });
+      });
+    }
+
+    // Catch Sequence implementation 
+    function catch_pokemon(pokemonObj, data) { 
+      if (!pokemonObj || pokemonObj.isCatching) return;
+      pokemonObj.isCatching = true;
+
+      const pokemonMesh = pokemonObj.mesh;
+      const targetBall = pokeballs[pokeballs.length - 1]?.mesh;
+
+      let startTime = clock.getElapsedTime();
+
+      // Phase 1: Vacuum / Shrink into ball
+      const vacuumInterval = setInterval(() => {
+        const elapsed = clock.getElapsedTime() - startTime;
+        if (elapsed < 0.8) {
+          const progress = elapsed / 0.8;
+          pokemonMesh.scale.multiplyScalar(0.85);
+          if (targetBall) pokemonMesh.position.lerp(targetBall.position, 0.2);
+        } else {
+          clearInterval(vacuumInterval);
+          scene.remove(pokemonMesh);
+
+          // Phase 2: Ball Shake 3 times
+          if (targetBall) {
+            let shakeCount = 0;
+            const shakeInterval = setInterval(() => {
+              targetBall.rotation.z += (shakeCount % 2 === 0 ? 0.3 : -0.3);
+              shakeCount++;
+              if (shakeCount >= 6) { // 3 full back-and-forth cycles
+                clearInterval(shakeInterval);
+                targetBall.rotation.z = 0;
+
+                // Phase 3: Star Particle Burst
+                createStarBurst(targetBall.position);
+
+                // Phase 4: Sync to Inventory & Cleanup
+                inventory.push(data);
+                updateInventoryUI();
+                if (currentUser && currentPass) {
+                  update_inventory(currentUser, currentPass, inventory);
+                }
+
+                setTimeout(() => {
+                  scene.remove(targetBall);
+                  activePokemon = null;
+                }, 1000);
+              }
+            }, 300);
+          }
+        }
+      }, 30);
+    }
+
+    function createStarBurst(pos) {
+      const pCount = 30;
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+      for (let i = 0; i < pCount; i++) {
+        positions.push(pos.x, pos.y, pos.z);
+      }
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      
+      const material = new THREE.PointsMaterial({ color: 0xffd700, size: 0.1 });
+      const pSystem = new THREE.Points(geometry, material);
+      scene.add(pSystem);
+
+      let frame = 0;
+      const anim = setInterval(() => {
+        frame++;
+        const posAttr = pSystem.geometry.attributes.position;
+        for (let i = 0; i < pCount; i++) {
+          posAttr.setXYZ(
+            i,
+            posAttr.getX(i) + (Math.random() - 0.5) * 0.1,
+            posAttr.getY(i) + (Math.random() - 0.5) * 0.1,
+            posAttr.getZ(i) + (Math.random() - 0.5) * 0.1
+          );
+        }
+        posAttr.needsUpdate = true;
+        if (frame > 20) {
+          clearInterval(anim);
+          scene.remove(pSystem);
+        }
+      }, 30);
+    }
+
+
+    // ==========================================
+    // 5. GYROSCOPE / WALKING SPAWN DETECTION
+    // ==========================================
+    let lastSpawnTime = 0;
+    
+    function requestMotionPermission() {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission().catch(() => {});
+      }
+    }
+    window.addEventListener('click', requestMotionPermission, { once: true });
+
+    window.addEventListener('devicemotion', (evt) => {
+      const acc = evt.accelerationIncludingGravity;
+      if (!acc) return;
+
+      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const now = Date.now();
+
+      // Detection threshold for step acceleration dynamics (~12.5 m/s²)
+      if (mag > 12.5 && (now - lastSpawnTime > 5000)) { // 5-second cooldown
+        lastSpawnTime = now;
+        const randomPokedexId = Math.floor(Math.random() * 150) + 1;
+        const randomData = [randomPokedexId, Math.floor(Math.random()*50)+1, Math.floor(Math.random()*50)+1, Math.floor(Math.random()*50)+1];
+        spawn_pokemon(randomData);
+      }
+    });
+
+
+    // ==========================================
+    // 6. SWIPE TO THROW INTERACTION
+    // ==========================================
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    window.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+    });
+
+    window.addEventListener('touchend', (e) => {
+      const deltaY = touchStartY - e.changedTouches[0].clientY;
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+
+      // Detect swipe up (deltaY > 80px)
+      if (deltaY > 80) {
+        const dir = new THREE.Vector3(
+          (deltaX / window.innerWidth) * 0.8,
+          (deltaY / window.innerHeight) * 1.2,
+          -1
+        ).unproject(camera).sub(camera.position).normalize();
+
+        throw_pokeball(dir);
+      }
+    });
+
+
+    // ==========================================
+    // 7. ANIMATION LOOP & PHYSICS TICK
+    // ==========================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+
+      // Pokeball Physics Update Loop
+      for (let i = pokeballs.length - 1; i >= 0; i--) {
+        const ball = pokeballs[i];
+        if (!ball.active) continue;
+
+        // Apply Velocity & Gravity (vy = vy - g * dt)
+        ball.velocity.y -= gravity * dt;
+        ball.mesh.position.addScaledVector(ball.velocity, dt);
+
+        // Collision Check with Active Pokemon
+        if (activePokemon && !activePokemon.isCatching) {
+          const dist = ball.mesh.position.distanceTo(activePokemon.mesh.position);
+          if (dist < 0.8) { // Collision radius threshold
+            ball.active = false;
+            catch_pokemon(activePokemon, activePokemon.data);
+          }
+        }
+
+        // Cleanup ground-hit/out-of-bounds balls after 4s
+        if (clock.getElapsedTime() - ball.createdTime > 4.0) {
+          scene.remove(ball.mesh);
+          pokeballs.splice(i, 1);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>
