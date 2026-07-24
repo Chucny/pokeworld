@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Pokeworld</title>
+  <title>Pokeworld AR</title>
   <style>
     * {
       box-sizing: border-box;
@@ -18,8 +18,10 @@
       background-color: #000;
       color: #ffffff;
       user-select: none;
+      -webkit-user-select: none;
     }
 
+    /* Video & Canvas Layers */
     #webcam {
       position: absolute;
       top: 0;
@@ -36,7 +38,7 @@
       width: 100vw;
       height: 100vh;
       z-index: 1;
-      pointer-events: none;
+      pointer-events: none; /* Let touches pass through to document */
     }
 
     /* Auth Overlay */
@@ -159,10 +161,6 @@
       opacity: 1;
       pointer-events: auto;
     }
-    .hud-controls {
-      display: flex;
-      gap: 8px;
-    }
     .hud-pill {
       background: rgba(15, 23, 42, 0.8);
       backdrop-filter: blur(8px);
@@ -175,16 +173,6 @@
       display: flex;
       align-items: center;
       gap: 8px;
-    }
-    .hud-btn-spawn {
-      background: rgba(56, 189, 248, 0.3);
-      border: 1px solid rgba(56, 189, 248, 0.6);
-      color: #38bdf8;
-      padding: 8px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
     }
     .hud-btn-exit {
       background: rgba(239, 68, 68, 0.3);
@@ -201,6 +189,10 @@
       height: 8px;
       border-radius: 50%;
       background: #4ade80;
+      transition: background 0.3s ease;
+    }
+    .sync-indicator.syncing {
+      background: #fbbf24; /* Yellow when syncing */
     }
   </style>
 
@@ -221,7 +213,7 @@
   <div id="login-overlay">
     <div class="login-card">
       <h1 class="brand-title">POKEWORLD</h1>
-      <p class="brand-subtitle">Login to access the game</p>
+      <p class="brand-subtitle">Login to access AR</p>
 
       <div class="tab-group">
         <button class="tab-btn active" id="tab-login">Login</button>
@@ -238,19 +230,17 @@
 
   <div id="game-hud">
     <div class="hud-pill">
-      <span class="sync-indicator"></span>
+      <span class="sync-indicator" id="sync-dot"></span>
       <span id="user-display">Trainer</span>
       <span style="opacity: 0.4;">|</span>
       <span>Caught: <strong id="caught-count" style="color: #38bdf8;">0</strong></span>
     </div>
-    <div class="hud-controls">
-      
-      <button class="hud-btn-exit" id="exit-btn">Exit</button>
-    </div>
+    <button class="hud-btn-exit" id="exit-btn">Exit</button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
     import { getDatabase, ref, get, child, set, update, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -270,16 +260,17 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
     const db = getDatabase(app);
 
     let currentUser = null;
     let currentPass = null;
     let inventory = [];
+    let syncIntervalId = null;
 
     async function create_account(username, password) {
       if (!username || !password) throw new Error("Please fill in all fields.");
-      const dbRef = ref(db);
-      const snapshot = await get(child(dbRef, `users/${username}`));
+      const snapshot = await get(child(ref(db), `users/${username}`));
       if (snapshot.exists()) throw new Error("Username already taken.");
       await set(ref(db, `users/${username}`), {
         password: password,
@@ -288,8 +279,7 @@
     }
 
     async function load_inventory(username, password) {
-      const dbRef = ref(db);
-      const snapshot = await get(child(dbRef, `users/${username}`));
+      const snapshot = await get(child(ref(db), `users/${username}`));
       if (!snapshot.exists()) throw new Error("Account does not exist.");
       const data = snapshot.val();
       if (data.password !== password) throw new Error("Incorrect password.");
@@ -297,123 +287,16 @@
     }
 
     async function update_inventory(username, password, current_inventory) {
+      const syncDot = document.getElementById('sync-dot');
+      syncDot.classList.add('syncing'); // Visual feedback for sync
       await update(ref(db, `users/${username}`), {
         inventory: JSON.stringify(current_inventory)
       });
+      setTimeout(() => syncDot.classList.remove('syncing'), 500);
     }
-
-    async function delete_account(username, password) {
-      await load_inventory(username, password);
-      await remove(ref(db, `users/${username}`));
-    }
-
-    window.create_account = create_account;
-    window.load_inventory = load_inventory;
-    window.update_inventory = update_inventory;
-    window.delete_account = delete_account;
-
 
     // ==========================================
-    // 2. AUTH SCREEN CONTROLS
-    // ==========================================
-    let authMode = 'login';
-
-    function switchMode(mode) {
-      authMode = mode;
-      document.getElementById('tab-login').className = 'tab-btn' + (mode === 'login' ? ' active' : '');
-      document.getElementById('tab-signup').className = 'tab-btn' + (mode === 'signup' ? ' active' : '');
-      document.getElementById('action-btn').innerText = mode === 'login' ? 'Enter Game' : 'Create Account';
-      document.getElementById('auth-status').innerText = '';
-    }
-
-    async function handleSubmit() {
-      requestDevicePermissions();
-
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value.trim();
-      const statusEl = document.getElementById('auth-status');
-
-      if (!u || !p) {
-        statusEl.innerText = "Username and password required.";
-        return;
-      }
-
-      statusEl.innerText = "Connecting...";
-
-      try {
-        if (authMode === 'signup') {
-          await create_account(u, p);
-        }
-        await loadAndEnterGame(u, p);
-      } catch (err) {
-        statusEl.innerText = err.message;
-      }
-    }
-
-    async function loadAndEnterGame(u, p) {
-      try {
-        const invStr = await load_inventory(u, p);
-        inventory = JSON.parse(invStr);
-        currentUser = u;
-        currentPass = p;
-
-        document.getElementById('login-overlay').classList.add('hidden');
-        document.getElementById('game-hud').classList.add('visible');
-        document.getElementById('user-display').innerText = u;
-        updateCaughtCounter();
-
-        // Spawn initial Pokemon 5m directly in front of camera view
-        triggerRandomSpawn();
-      } catch (err) {
-        document.getElementById('auth-status').innerText = err.message;
-      }
-    }
-
-    function handleLogout() {
-      currentUser = null;
-      currentPass = null;
-      inventory = [];
-
-      document.getElementById('game-hud').classList.remove('visible');
-      document.getElementById('login-overlay').classList.remove('hidden');
-      document.getElementById('auth-status').innerText = '';
-      document.getElementById('password').value = '';
-    }
-
-    function updateCaughtCounter() {
-      document.getElementById('caught-count').innerText = inventory.length;
-    }
-
-    document.getElementById('tab-login').addEventListener('click', () => switchMode('login'));
-    document.getElementById('tab-signup').addEventListener('click', () => switchMode('signup'));
-    document.getElementById('action-btn').addEventListener('click', handleSubmit);
-    document.getElementById('exit-btn').addEventListener('click', handleLogout);
-    document.getElementById('manual-spawn-btn').addEventListener('click', () => triggerRandomSpawn());
-
-    window.switchMode = switchMode;
-    window.handleSubmit = handleSubmit;
-    window.handleLogout = handleLogout;
-
-
-    // ==========================================
-    // 3. WEBCAM STREAM SETUP
-    // ==========================================
-    async function initWebcam() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false
-        });
-        document.getElementById('webcam').srcObject = stream;
-      } catch (e) {
-        console.warn("Camera streaming unavailable.", e);
-      }
-    }
-    initWebcam();
-
-
-    // ==========================================
-    // 4. THREE.JS SCENE & CORRECT LIGHTING
+    // 2. THREE.JS SCENE SETUP
     // ==========================================
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
@@ -427,48 +310,55 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
-    // Balanced Lighting (Prevents white textures)
+    // Balanced Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     scene.add(ambientLight);
-
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     dirLight.position.set(5, 10, 5);
     scene.add(dirLight);
 
     const gltfLoader = new GLTFLoader();
 
+    // Scales any GLTF model to exactly 1 meter
     function loadNormalizedGLTF(url, callback, fallbackUrl = '8.glb') {
       gltfLoader.load(
         url,
         (gltf) => {
           const model = gltf.scene;
-
           const box = new THREE.Box3().setFromObject(model);
           const size = new THREE.Vector3();
           box.getSize(size);
 
           const maxDim = Math.max(size.x, size.y, size.z);
           if (maxDim > 0) {
-            const scaleFactor = 1.0 / maxDim;
+            const scaleFactor = 1.0 / maxDim; // Forces max dimension to be exactly 1m
             model.scale.set(scaleFactor, scaleFactor, scaleFactor);
           }
-
           callback(model);
         },
         undefined,
         (err) => {
           console.warn(`Could not load ${url}. Fallback to ${fallbackUrl}`);
-          if (url !== fallbackUrl) {
-            loadNormalizedGLTF(fallbackUrl, callback, fallbackUrl);
-          }
+          if (url !== fallbackUrl) loadNormalizedGLTF(fallbackUrl, callback, fallbackUrl);
         }
       );
     }
 
+    // ==========================================
+    // 3. HARDWARE PERMISSIONS & WEBCAM
+    // ==========================================
+    async function initWebcam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+        document.getElementById('webcam').srcObject = stream;
+      } catch (e) {
+        console.warn("Camera streaming unavailable.", e);
+      }
+    }
 
-    // ==========================================
-    // 5. GYROSCOPE (NATIVE AR LOOK-AROUND FIX)
-    // ==========================================
     function requestDevicePermissions() {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
@@ -487,15 +377,12 @@
       }
     }
 
-    // Proper device-frame transformation matrix to anchor objects in world space
-    const zee = new THREE.Vector3(0, 0, 1);
+    // Gyroscope to Camera Rotation
     const euler = new THREE.Euler();
-    const q0 = new THREE.Quaternion();
     const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90 deg X-axis shift
 
     function handleOrientation(event) {
       if (event.alpha === null || event.beta === null) return;
-
       const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
       const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
       const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
@@ -505,27 +392,39 @@
       camera.quaternion.multiply(q1);
     }
 
-
     // ==========================================
-    // 6. AR GAMEPLAY & SPAWNING (5m In Front of View)
+    // 4. AR GAMEPLAY (Spawning & Catching)
     // ==========================================
     let activePokemon = null;
     let pokeballs = [];
     const gravity = 9.81;
 
-    function triggerRandomSpawn() {
-      const randomData = [
-        8, // Primary Pokedex model (8.glb)
-        Math.floor(Math.random() * 50) + 1,
-        Math.floor(Math.random() * 50) + 1,
-        Math.floor(Math.random() * 50) + 1
-      ];
-      spawn_pokemon(randomData);
+    // Gyrometer Walking Detection
+    let lastSpawnTime = 0;
+    function handleMotion(evt) {
+      if (!currentUser) return;
+      const acc = evt.accelerationIncludingGravity;
+      if (!acc) return;
+
+      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const now = Date.now();
+
+      // Look for walking magnitude (> 13.0) with 5-second cooldown
+      if (mag > 13.0 && (now - lastSpawnTime > 5000)) {
+        lastSpawnTime = now;
+        
+        const randomData = [
+          8, // ID
+          Math.floor(Math.random() * 50) + 1,
+          Math.floor(Math.random() * 50) + 1,
+          Math.floor(Math.random() * 50) + 1
+        ];
+        spawn_pokemon(randomData);
+      }
     }
 
     function spawn_pokemon(data, position) {
-      const pokedexId = data[0];
-      const modelPath = pokedexId + ".glb";
+      const modelPath = data[0] + ".glb";
 
       loadNormalizedGLTF(modelPath, (model) => {
         if (activePokemon) scene.remove(activePokemon.mesh);
@@ -534,15 +433,9 @@
         if (position) {
           targetPos.copy(position);
         } else {
-          // SPAWN EXACTLY 5.0 METERS IN FRONT OF CURRENT CAMERA VIEWING DIRECTION
-          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-          forward.y = 0; // Keep flat on ground plane
-          forward.normalize();
-
-          if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
-
-          targetPos.copy(camera.position).add(forward.multiplyScalar(5.0));
-          targetPos.y = -0.5; // Slightly below camera eye level
+          // Spawn exactly 1.4m below the camera view based on design doc
+          targetPos.copy(camera.position);
+          targetPos.y -= 1.4;
         }
 
         model.position.copy(targetPos);
@@ -594,7 +487,7 @@
           clearInterval(vacuumInterval);
           scene.remove(pokemonMesh);
 
-          // Ball shake phase
+          // Shake phase
           if (targetBall) {
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
@@ -607,10 +500,7 @@
                 createStarBurst(targetBall.position);
 
                 inventory.push(data);
-                updateCaughtCounter();
-                if (currentUser && currentPass) {
-                  update_inventory(currentUser, currentPass, inventory);
-                }
+                document.getElementById('caught-count').innerText = inventory.length;
 
                 setTimeout(() => {
                   scene.remove(targetBall);
@@ -653,36 +543,7 @@
       }, 30);
     }
 
-    window.spawn_pokemon = spawn_pokemon;
-    window.throw_pokeball = throw_pokeball;
-    window.catch_pokemon = catch_pokemon;
-    window.triggerRandomSpawn = triggerRandomSpawn;
-
-
-    // ==========================================
-    // 7. MOTION SHAKE EVENT
-    // ==========================================
-    let lastSpawnTime = 0;
-
-    function handleMotion(evt) {
-      if (!currentUser) return;
-
-      const acc = evt.accelerationIncludingGravity;
-      if (!acc) return;
-
-      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-      const now = Date.now();
-
-      if (mag > 13.0 && (now - lastSpawnTime > 5000)) {
-        lastSpawnTime = now;
-        triggerRandomSpawn();
-      }
-    }
-
-
-    // ==========================================
-    // 8. SWIPE THROW
-    // ==========================================
+    // Swipe Tracking
     let touchStartY = 0;
     let touchStartX = 0;
 
@@ -693,10 +554,10 @@
 
     window.addEventListener('touchend', (e) => {
       if (!currentUser) return;
-
       const deltaY = touchStartY - e.changedTouches[0].clientY;
       const deltaX = e.changedTouches[0].clientX - touchStartX;
 
+      // Swipe Up detection
       if (deltaY > 50) {
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -715,12 +576,10 @@
       }
     });
 
-
     // ==========================================
-    // 9. ANIMATION LOOP
+    // 5. ANIMATION LOOP
     // ==========================================
     const clock = new THREE.Clock();
-
     function animate() {
       requestAnimationFrame(animate);
       const dt = clock.getDelta();
@@ -745,9 +604,9 @@
           pokeballs.splice(i, 1);
         }
       }
-
       renderer.render(scene, camera);
     }
+    animate();
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -755,7 +614,81 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    animate();
+    // ==========================================
+    // 6. UI AUTH CONTROLS
+    // ==========================================
+    let authMode = 'login';
+    function switchMode(mode) {
+      authMode = mode;
+      document.getElementById('tab-login').className = 'tab-btn' + (mode === 'login' ? ' active' : '');
+      document.getElementById('tab-signup').className = 'tab-btn' + (mode === 'signup' ? ' active' : '');
+      document.getElementById('action-btn').innerText = mode === 'login' ? 'Enter Game' : 'Create Account';
+      document.getElementById('auth-status').innerText = '';
+    }
+
+    async function handleSubmit() {
+      // Must request permissions inside user interaction handler
+      requestDevicePermissions();
+      await initWebcam();
+
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      const statusEl = document.getElementById('auth-status');
+
+      if (!u || !p) {
+        statusEl.innerText = "Username and password required.";
+        return;
+      }
+
+      statusEl.innerText = "Connecting...";
+
+      try {
+        if (authMode === 'signup') await create_account(u, p);
+        
+        const invStr = await load_inventory(u, p);
+        inventory = JSON.parse(invStr);
+        currentUser = u;
+        currentPass = p;
+
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('game-hud').classList.add('visible');
+        document.getElementById('user-display').innerText = u;
+        document.getElementById('caught-count').innerText = inventory.length;
+
+        // 15 Second Database Sync Requirement
+        syncIntervalId = setInterval(() => {
+          if (currentUser && currentPass) {
+            update_inventory(currentUser, currentPass, inventory);
+          }
+        }, 15000);
+
+      } catch (err) {
+        statusEl.innerText = err.message;
+      }
+    }
+
+    function handleLogout() {
+      currentUser = null;
+      currentPass = null;
+      inventory = [];
+      if (syncIntervalId) clearInterval(syncIntervalId);
+
+      document.getElementById('game-hud').classList.remove('visible');
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('auth-status').innerText = '';
+      document.getElementById('password').value = '';
+      
+      if (activePokemon) {
+        scene.remove(activePokemon.mesh);
+        activePokemon = null;
+      }
+    }
+
+    document.getElementById('tab-login').addEventListener('click', () => switchMode('login'));
+    document.getElementById('tab-signup').addEventListener('click', () => switchMode('signup'));
+    document.getElementById('action-btn').addEventListener('click', handleSubmit);
+    document.getElementById('exit-btn').addEventListener('click', handleLogout);
+
   </script>
 </body>
 </html>
