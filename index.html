@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Pokeworld AR</title>
+  <title>Pokeworld</title>
   <style>
     * {
       box-sizing: border-box;
@@ -15,13 +15,13 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
-      background-color: #000;
+      background-color: #000000;
       color: #ffffff;
       user-select: none;
       -webkit-user-select: none;
     }
 
-    /* Video feed matched precisely to viewport dimensions */
+    /* WebRTC Background Camera Feed */
     #webcam {
       position: absolute;
       top: 50%;
@@ -32,6 +32,8 @@
       transform: translate(-50%, -50%);
       z-index: 0;
     }
+
+    /* 3D WebGL Canvas Layer */
     #canvas-container {
       position: absolute;
       top: 0;
@@ -42,7 +44,7 @@
       pointer-events: none;
     }
 
-    /* Auth Overlay */
+    /* Login & Account Overlay */
     #login-overlay {
       position: fixed;
       top: 0;
@@ -50,9 +52,9 @@
       width: 100vw;
       height: 100vh;
       z-index: 100;
-      background: rgba(5, 5, 8, 0.88);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: rgba(8, 10, 16, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -75,6 +77,7 @@
       box-shadow: 0 20px 40px rgba(0,0,0,0.6);
       text-align: center;
     }
+
     .brand-title {
       font-size: 24px;
       font-weight: 800;
@@ -84,6 +87,7 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
     .brand-subtitle {
       font-size: 12px;
       color: #94a3b8;
@@ -97,6 +101,7 @@
       border-radius: 10px;
       margin-bottom: 16px;
     }
+
     .tab-btn {
       flex: 1;
       background: transparent;
@@ -108,6 +113,7 @@
       border-radius: 8px;
       cursor: pointer;
     }
+
     .tab-btn.active {
       background: rgba(255, 255, 255, 0.2);
       color: #ffffff;
@@ -119,15 +125,16 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 10px;
       padding: 12px;
-      color: #fff;
+      color: #ffffff;
       font-size: 14px;
       outline: none;
       margin-bottom: 10px;
     }
+
     .submit-btn {
       width: 100%;
       background: linear-gradient(135deg, #0284c7, #2563eb);
-      color: white;
+      color: #ffffff;
       border: none;
       padding: 12px;
       border-radius: 10px;
@@ -144,7 +151,7 @@
       color: #f87171;
     }
 
-    /* HUD Bar */
+    /* Game HUD Overlay */
     #game-hud {
       position: absolute;
       top: 16px;
@@ -162,8 +169,9 @@
       opacity: 1;
       pointer-events: auto;
     }
+
     .hud-pill {
-      background: rgba(15, 23, 42, 0.8);
+      background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.2);
       padding: 8px 14px;
@@ -175,6 +183,7 @@
       align-items: center;
       gap: 8px;
     }
+
     .hud-btn-exit {
       background: rgba(239, 68, 68, 0.3);
       border: 1px solid rgba(239, 68, 68, 0.5);
@@ -185,6 +194,7 @@
       font-weight: 600;
       cursor: pointer;
     }
+
     .sync-indicator {
       width: 8px;
       height: 8px;
@@ -209,12 +219,13 @@
 <body>
 
   <video id="webcam" autoplay playsinline muted></video>
+
   <div id="canvas-container"></div>
 
   <div id="login-overlay">
     <div class="login-card">
       <h1 class="brand-title">POKEWORLD AR</h1>
-      <p class="brand-subtitle">Login to enter AR World</p>
+      <p class="brand-subtitle">Login to enter 3DOF World</p>
 
       <div class="tab-group">
         <button class="tab-btn active" id="tab-login">Login</button>
@@ -224,7 +235,7 @@
       <input type="text" id="username" class="input-field" placeholder="Username" autocomplete="off">
       <input type="password" id="password" class="input-field" placeholder="Password">
 
-      <button id="action-btn" class="submit-btn">Enter Game</button>
+      <button id="action-btn" class="submit-btn">Start Game</button>
       <div id="auth-status"></div>
     </div>
   </div>
@@ -245,9 +256,9 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-    // ==========================================
-    // 1. FIREBASE CONFIG & API
-    // ==========================================
+    // =========================================================================
+    // SECTION 1: FIREBASE CONFIG & DATABASE HELPER FUNCTIONS
+    // =========================================================================
     const firebaseConfig = {
       apiKey: "AIzaSyCcucgyr9Y8I7IIB7a-N5HjPXD7XDHiPLw",
       authDomain: "pokeworld-game.firebaseapp.com",
@@ -268,9 +279,9 @@
     let syncIntervalId = null;
 
     async function create_account(username, password) {
-      if (!username || !password) throw new Error("Please fill in all fields.");
+      if (!username || !password) throw new Error("Please enter username & password.");
       const snapshot = await get(child(ref(db), `users/${username}`));
-      if (snapshot.exists()) throw new Error("Username already taken.");
+      if (snapshot.exists()) throw new Error("Username is already taken.");
       await set(ref(db, `users/${username}`), {
         password: password,
         inventory: JSON.stringify([])
@@ -279,7 +290,7 @@
 
     async function load_inventory(username, password) {
       const snapshot = await get(child(ref(db), `users/${username}`));
-      if (!snapshot.exists()) throw new Error("Account does not exist.");
+      if (!snapshot.exists()) throw new Error("Account not found.");
       const data = snapshot.val();
       if (data.password !== password) throw new Error("Incorrect password.");
       return data.inventory || "[]";
@@ -304,21 +315,24 @@
     window.update_inventory = update_inventory;
     window.delete_account = delete_account;
 
-    // ==========================================
-    // 2. THREE.JS & OPTICAL FOV CALIBRATION
-    // ==========================================
+    // =========================================================================
+    // SECTION 2: THREE.JS 3D SCENE SETUP
+    // =========================================================================
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
 
+    // Perspective Camera
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 500);
     camera.position.set(0, 0, 0);
 
+    // WebGL Renderer with full transparency overlay over video
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
+    // Scene Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
     scene.add(ambientLight);
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -327,7 +341,7 @@
 
     const gltfLoader = new GLTFLoader();
 
-    // Scale GLB max dimension to exactly 1.0 meter
+    // Normalizes GLB models so their bounding size is scaled down to exactly 1.0 meter
     function loadNormalizedGLTF(url, callback, fallbackUrl = '8.glb') {
       gltfLoader.load(
         url,
@@ -339,22 +353,21 @@
 
           const maxDim = Math.max(size.x, size.y, size.z);
           if (maxDim > 0) {
-            const scaleFactor = 1.0 / maxDim; // 1m magic scale
+            const scaleFactor = 1.0 / maxDim; // Exactly 1m scale
             model.scale.set(scaleFactor, scaleFactor, scaleFactor);
           }
           callback(model);
         },
         undefined,
-        (err) => {
-          console.warn(`Could not load ${url}. Fallback to ${fallbackUrl}`);
+        () => {
           if (url !== fallbackUrl) loadNormalizedGLTF(fallbackUrl, callback, fallbackUrl);
         }
       );
     }
 
-    // ==========================================
-    // 3. CAMERA FEED & PROJECTION MATCHING
-    // ==========================================
+    // =========================================================================
+    // SECTION 3: WEBCAM FEED INITIALIZATION
+    // =========================================================================
     const videoElement = document.getElementById('webcam');
 
     async function initWebcam() {
@@ -364,84 +377,75 @@
           audio: false
         });
         videoElement.srcObject = stream;
-
-        videoElement.onloadedmetadata = () => {
-          videoElement.play();
-          calibrateCameraProjection();
-        };
-      } catch (e) {
-        console.warn("Camera stream unavailable.", e);
+        videoElement.play();
+      } catch (err) {
+        console.warn("Camera access denied or unavailable.", err);
       }
     }
 
-    function calibrateCameraProjection() {
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-      const screenAspect = windowWidth / windowHeight;
-
-      let vWidth = videoElement.videoWidth || 1280;
-      let vHeight = videoElement.videoHeight || 720;
-      let videoAspect = vWidth / vHeight;
-
-      let defaultFov = 60; // Standard smartphone primary lens FOV
-      if (screenAspect < videoAspect) {
-        let fovRad = 2 * Math.atan(Math.tan((defaultFov * Math.PI / 180) / 2) * (videoAspect / screenAspect));
-        camera.fov = fovRad * (180 / Math.PI);
-      } else {
-        camera.fov = defaultFov;
-      }
-
-      camera.aspect = screenAspect;
-      camera.updateProjectionMatrix();
-      renderer.setSize(windowWidth, windowHeight);
-    }
-
-    // ==========================================
-    // 4. ORIENTATION & GYRO TRANSFORM
-    // ==========================================
-    function requestDevicePermissions() {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-          .then(res => { if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation); })
-          .catch(console.error);
-      } else {
-        window.addEventListener('deviceorientation', handleOrientation);
-      }
-
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        DeviceMotionEvent.requestPermission()
-          .then(res => { if (res === 'granted') window.addEventListener('devicemotion', handleMotion); })
-          .catch(console.error);
-      } else {
-        window.addEventListener('devicemotion', handleMotion);
-      }
-    }
-
+    // =========================================================================
+    // SECTION 4: 3DOF GYROSCOPE & ROTATIONAL PERSPECTIVE BINDING
+    // =========================================================================
     const euler = new THREE.Euler();
     const deviceQuaternion = new THREE.Quaternion();
     const screenTransform = new THREE.Quaternion();
-    const worldTransform = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90 deg X axis shift
+    const worldTransform = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // Alignment shift
 
     function handleOrientation(event) {
       if (event.alpha === null || event.beta === null) return;
 
-      const alpha = THREE.MathUtils.degToRad(event.alpha || 0);
-      const beta = THREE.MathUtils.degToRad(event.beta || 0);
-      const gamma = THREE.MathUtils.degToRad(event.gamma || 0);
+      // Convert angles from degrees to radians
+      const alpha = THREE.MathUtils.degToRad(event.alpha || 0); // Compass Yaw
+      const beta  = THREE.MathUtils.degToRad(event.beta || 0);  // Tilt Pitch
+      const gamma = THREE.MathUtils.degToRad(event.gamma || 0); // Side Roll
       const orient = window.orientation ? THREE.MathUtils.degToRad(window.orientation) : 0;
 
+      // Construct Euler rotation in YXZ order for smartphone IMUs
       euler.set(beta, alpha, -gamma, 'YXZ');
       deviceQuaternion.setFromEuler(euler);
       screenTransform.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -orient);
 
+      // Apply complete 3DOF quaternion transform directly to Three.js camera
       camera.quaternion.copy(deviceQuaternion);
       camera.quaternion.multiply(worldTransform);
       camera.quaternion.multiply(screenTransform);
     }
 
-    // ==========================================
-    // 5. STEP DETECTION & SPAWNING
-    // ==========================================
+    async function requestDeviceSensors() {
+      // iOS Safari explicit permission request
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const res = await DeviceOrientationEvent.requestPermission();
+          if (res === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation, true);
+          } else {
+            alert("Gyroscope permission denied. Please enable motion access.");
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+
+      // Accelerometer step motion access
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const res = await DeviceMotionEvent.requestPermission();
+          if (res === 'granted') {
+            window.addEventListener('devicemotion', handleMotion, true);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        window.addEventListener('devicemotion', handleMotion, true);
+      }
+    }
+
+    // =========================================================================
+    // SECTION 5: STEP DETECTION & SPAWNING
+    // =========================================================================
     let activePokemon = null;
     let pokeballs = [];
     const gravity = 9.81;
@@ -459,7 +463,7 @@
       lastAccMag = mag;
 
       const now = Date.now();
-      if (delta > 3.0 && (now - lastSpawnTime > 5000)) { // Step trigger
+      if (delta > 3.0 && (now - lastSpawnTime > 5000)) {
         lastSpawnTime = now;
         triggerRandomSpawn();
       }
@@ -467,7 +471,7 @@
 
     function triggerRandomSpawn() {
       const randomData = [
-        8, // Model 8.glb
+        Math.floor(Math.random() * 151) + 1, // Model 1-151.glb
         Math.floor(Math.random() * 50) + 1,
         Math.floor(Math.random() * 50) + 1,
         Math.floor(Math.random() * 50) + 1
@@ -485,16 +489,15 @@
         if (position) {
           targetPos.copy(position);
         } else {
-          // Lock forward vector horizontally on ground plane
+          // Calculate forward vector based on current 3DOF camera perspective
           const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-          forward.y = 0;
+          forward.y = 0; // Lock to floor plane
           if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
           forward.normalize();
 
-          // Spawn 2.2m ahead, 1.4m below eye level
-          targetPos.copy(camera.position);
-          targetPos.addScaledVector(forward, 2.2);
-          targetPos.y -= 1.4;
+          // Anchor 2.5 meters in front of current camera heading, 1.4m below eye level
+          targetPos.copy(camera.position).addScaledVector(forward, 3.0);
+          targetPos.y -= 1.2;
         }
 
         model.position.copy(targetPos);
@@ -509,14 +512,12 @@
       });
     }
 
-    // ==========================================
-    // 6. POKEBALL PHYSICS & CATCH MECHANICS
-    // ==========================================
+    // =========================================================================
+    // SECTION 6: POKÉBALL PHYSICS & VACUUM CATCH
+    // =========================================================================
     function throw_pokeball(forwardVel, upwardVel, rightVel) {
       loadNormalizedGLTF('ball.glb', (ballMesh) => {
-        const handOffset = new THREE.Vector3(0.15, -0.25, -0.4);
-        handOffset.applyQuaternion(camera.quaternion);
-        
+        const handOffset = new THREE.Vector3(0.15, -0.25, -0.4).applyQuaternion(camera.quaternion);
         const startPos = new THREE.Vector3().copy(camera.position).add(handOffset);
         ballMesh.position.copy(startPos);
         scene.add(ballMesh);
@@ -547,7 +548,7 @@
       const targetBall = pokeballs[pokeballs.length - 1]?.mesh;
       let startTime = clock.getElapsedTime();
 
-      // Vacuum shrink
+      // Vacuum shrink animation towards Pokéball
       const vacuumInterval = setInterval(() => {
         const elapsed = clock.getElapsedTime() - startTime;
         if (elapsed < 0.8) {
@@ -557,7 +558,7 @@
           clearInterval(vacuumInterval);
           scene.remove(pokemonMesh);
 
-          // 3 shakes
+          // 3 capture shakes
           if (targetBall) {
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
@@ -612,7 +613,7 @@
       }, 30);
     }
 
-    // Touch gesture physics throw
+    // Swipe gesture throwing
     let touchStartY = 0;
     let touchStartX = 0;
 
@@ -638,11 +639,10 @@
     window.spawn_pokemon = spawn_pokemon;
     window.throw_pokeball = throw_pokeball;
     window.catch_pokemon = catch_pokemon;
-    window.triggerRandomSpawn = triggerRandomSpawn;
 
-    // ==========================================
-    // 7. MAIN ANIMATION LOOP
-    // ==========================================
+    // =========================================================================
+    // SECTION 7: RENDER ANIMATION LOOP
+    // =========================================================================
     const clock = new THREE.Clock();
 
     function animate() {
@@ -674,23 +674,28 @@
     }
     animate();
 
-    window.addEventListener('resize', calibrateCameraProjection);
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
-    // ==========================================
-    // 8. AUTHENTICATION & DATABASE SYNC
-    // ==========================================
+    // =========================================================================
+    // SECTION 8: AUTH UI HANDLERS & INITIALIZATION
+    // =========================================================================
     let authMode = 'login';
 
     function switchMode(mode) {
       authMode = mode;
       document.getElementById('tab-login').className = 'tab-btn' + (mode === 'login' ? ' active' : '');
       document.getElementById('tab-signup').className = 'tab-btn' + (mode === 'signup' ? ' active' : '');
-      document.getElementById('action-btn').innerText = mode === 'login' ? 'Enter Game' : 'Create Account';
+      document.getElementById('action-btn').innerText = mode === 'login' ? 'Start Game' : 'Create Account';
       document.getElementById('auth-status').innerText = '';
     }
 
     async function handleSubmit() {
-      requestDevicePermissions();
+      // Must execute sensors request on user click event
+      await requestDeviceSensors();
       await initWebcam();
 
       const u = document.getElementById('username').value.trim();
@@ -698,7 +703,7 @@
       const statusEl = document.getElementById('auth-status');
 
       if (!u || !p) {
-        statusEl.innerText = "Username and password required.";
+        statusEl.innerText = "Please enter username and password.";
         return;
       }
 
