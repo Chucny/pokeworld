@@ -20,7 +20,7 @@
       user-select: none;
     }
 
-    /* Webcam & 3D AR Canvas */
+    /* AR Viewport & Camera Video */
     #webcam {
       position: absolute;
       top: 0;
@@ -40,7 +40,7 @@
       pointer-events: none;
     }
 
-    /* Full-screen Login Modal Screen */
+    /* Standard Login Modal Screen */
     #login-overlay {
       position: fixed;
       top: 0;
@@ -154,7 +154,7 @@
       color: #f87171;
     }
 
-    /* Minimal In-Game Top HUD (Visible only while playing) */
+    /* Minimal In-Game Top HUD */
     #game-hud {
       position: absolute;
       top: 16px;
@@ -202,12 +202,6 @@
       background: #4ade80;
     }
   </style>
-
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 
@@ -220,14 +214,14 @@
       <p class="brand-subtitle">Login to access your trainer data</p>
 
       <div class="tab-group">
-        <button class="tab-btn active" id="tab-login" onclick="switchMode('login')">Login</button>
-        <button class="tab-btn" id="tab-signup" onclick="switchMode('signup')">Create Account</button>
+        <button class="tab-btn active" id="tab-login" onclick="window.switchMode('login')">Login</button>
+        <button class="tab-btn" id="tab-signup" onclick="window.switchMode('signup')">Create Account</button>
       </div>
 
       <input type="text" id="username" class="input-field" placeholder="Username" autocomplete="off">
       <input type="password" id="password" class="input-field" placeholder="Password">
 
-      <button id="action-btn" class="submit-btn" onclick="handleSubmit()">Enter Game</button>
+      <button id="action-btn" class="submit-btn" onclick="window.handleSubmit()">Enter Game</button>
       <div id="auth-status"></div>
     </div>
   </div>
@@ -239,12 +233,17 @@
       <span style="opacity: 0.4;">|</span>
       <span>Caught: <strong id="caught-count" style="color: #38bdf8;">0</strong></span>
     </div>
-    <button class="hud-btn" onclick="handleLogout()">Exit Game</button>
+    <button class="hud-btn" onclick="window.handleLogout()">Exit Game</button>
   </div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getDatabase, ref, get, child, set, update, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+    import * as THREE from "https://unpkg.com/three@0.128.0/build/three.module.js";
+    import { GLTFLoader } from "https://unpkg.com/three@0.128.0/examples/jsm/loaders/GLTFLoader.js";
+
     // ==========================================
-    // 1. FIREBASE CONFIGURATION & CORE API
+    // 1. FIREBASE INITIALIZATION & CORE API
     // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyCcucgyr9Y8I7IIB7a-N5HjPXD7XDHiPLw",
@@ -257,53 +256,56 @@
       measurementId: "G-0R7TZPLYGG"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
     let currentUser = null;
     let currentPass = null;
-    let inventory = []; // Structure: [[pokedex_id, move1, move2, move3], ...]
+    let inventory = [];
 
-    // Standard API Functions
-    function create_account(username, password) {
-      if (!username || !password) return Promise.reject(new Error("Please fill in all fields."));
-      const userRef = db.ref('users/' + username);
-      return userRef.once('value').then(snapshot => {
-        if (snapshot.exists()) {
-          throw new Error("Username already taken.");
-        }
-        return userRef.set({
-          password: password,
-          inventory: JSON.stringify([])
-        });
+    async function create_account(username, password) {
+      if (!username || !password) throw new Error("Please fill in all fields.");
+      const dbRef = ref(db);
+      const snapshot = await get(child(dbRef, `users/${username}`));
+      if (snapshot.exists()) {
+        throw new Error("Username already taken.");
+      }
+      await set(ref(db, `users/${username}`), {
+        password: password,
+        inventory: JSON.stringify([])
       });
     }
 
-    function load_inventory(username, password) {
-      return db.ref('users/' + username).once('value').then(snapshot => {
-        if (!snapshot.exists()) throw new Error("Account does not exist.");
-        const data = snapshot.val();
-        if (data.password !== password) throw new Error("Incorrect password.");
-        return data.inventory || "[]";
-      });
+    async function load_inventory(username, password) {
+      const dbRef = ref(db);
+      const snapshot = await get(child(dbRef, `users/${username}`));
+      if (!snapshot.exists()) throw new Error("Account does not exist.");
+      const data = snapshot.val();
+      if (data.password !== password) throw new Error("Incorrect password.");
+      return data.inventory || "[]";
     }
 
-    function update_inventory(username, password, current_inventory) {
-      return db.ref('users/' + username).update({
+    async function update_inventory(username, password, current_inventory) {
+      await update(ref(db, `users/${username}`), {
         inventory: JSON.stringify(current_inventory)
       });
     }
 
-    function delete_account(username, password) {
-      return load_inventory(username, password).then(() => {
-        return db.ref('users/' + username).remove();
-      });
+    async function delete_account(username, password) {
+      await load_inventory(username, password);
+      await remove(ref(db, `users/${username}`));
     }
+
+    window.create_account = create_account;
+    window.load_inventory = load_inventory;
+    window.update_inventory = update_inventory;
+    window.delete_account = delete_account;
+
 
     // ==========================================
     // 2. AUTH SCREEN & UI CONTROLS
     // ==========================================
-    let authMode = 'login'; // 'login' or 'signup'
+    let authMode = 'login';
 
     function switchMode(mode) {
       authMode = mode;
@@ -313,7 +315,7 @@
       document.getElementById('auth-status').innerText = '';
     }
 
-    function handleSubmit() {
+    async function handleSubmit() {
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value.trim();
       const statusEl = document.getElementById('auth-status');
@@ -325,33 +327,32 @@
 
       statusEl.innerText = "Connecting...";
 
-      if (authMode === 'signup') {
-        create_account(u, p)
-          .then(() => loadAndEnterGame(u, p))
-          .catch(err => { statusEl.innerText = err.message; });
-      } else {
-        loadAndEnterGame(u, p);
+      try {
+        if (authMode === 'signup') {
+          await create_account(u, p);
+        }
+        await loadAndEnterGame(u, p);
+      } catch (err) {
+        statusEl.innerText = err.message;
       }
     }
 
-    function loadAndEnterGame(u, p) {
-      load_inventory(u, p)
-        .then(invStr => {
-          inventory = JSON.parse(invStr);
-          currentUser = u;
-          currentPass = p;
+    async function loadAndEnterGame(u, p) {
+      try {
+        const invStr = await load_inventory(u, p);
+        inventory = JSON.parse(invStr);
+        currentUser = u;
+        currentPass = p;
 
-          // Transition UI: Hide Login Screen, Reveal Game View
-          document.getElementById('login-overlay').classList.add('hidden');
-          document.getElementById('game-hud').classList.add('visible');
-          document.getElementById('user-display').innerText = u;
-          updateCaughtCounter();
-          
-          requestMotionPermission();
-        })
-        .catch(err => {
-          document.getElementById('auth-status').innerText = err.message;
-        });
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('game-hud').classList.add('visible');
+        document.getElementById('user-display').innerText = u;
+        updateCaughtCounter();
+
+        requestGyroPermissions();
+      } catch (err) {
+        document.getElementById('auth-status').innerText = err.message;
+      }
     }
 
     function handleLogout() {
@@ -359,7 +360,6 @@
       currentPass = null;
       inventory = [];
 
-      // Transition UI: Return to Login Screen
       document.getElementById('game-hud').classList.remove('visible');
       document.getElementById('login-overlay').classList.remove('hidden');
       document.getElementById('auth-status').innerText = '';
@@ -370,7 +370,10 @@
       document.getElementById('caught-count').innerText = inventory.length;
     }
 
-    // 15-Second Background Sync Loop
+    window.switchMode = switchMode;
+    window.handleSubmit = handleSubmit;
+    window.handleLogout = handleLogout;
+
     setInterval(() => {
       if (currentUser && currentPass) {
         update_inventory(currentUser, currentPass, inventory)
@@ -397,7 +400,7 @@
 
 
     // ==========================================
-    // 4. THREE.JS & MODEL LOADER (1.0m Normalization)
+    // 4. THREE.JS & FULL LIGHTING FIXES
     // ==========================================
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
@@ -408,23 +411,51 @@
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
+    
+    // LIGHTING FIX #1: Enable sRGB encoding & Filmic tone mapping so models aren't black
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.3;
     container.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    // LIGHTING FIX #2: All-around high-intensity lighting setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
     scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
 
-    const gltfLoader = new THREE.GLTFLoader();
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444455, 1.8);
+    hemiLight.position.set(0, 20, 0);
+    scene.add(hemiLight);
 
-    // Scales loaded GLBs so the largest dimension is exactly 1.0 meter
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight1.position.set(5, 10, 7);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight2.position.set(-5, -5, -5);
+    scene.add(dirLight2);
+
+    const gltfLoader = new GLTFLoader();
+
     function loadNormalizedGLTF(url, callback) {
       gltfLoader.load(
         url,
         (gltf) => {
           const model = gltf.scene;
-          
+
+          // LIGHTING FIX #3: Traverse meshes & fix materials so textures pop nicely
+          model.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.needsUpdate = true;
+              if (child.material.metalness !== undefined) {
+                child.material.metalness = 0.1; // Reduce metallic pitch-black reflection
+              }
+              if (child.material.roughness !== undefined) {
+                child.material.roughness = 0.6;
+              }
+            }
+          });
+
+          // Normalize model size to exactly 1.0 meter
           const box = new THREE.Box3().setFromObject(model);
           const size = new THREE.Vector3();
           box.getSize(size);
@@ -438,13 +469,50 @@
           callback(model);
         },
         undefined,
-        (err) => console.error("Could not load model file:", url)
+        (err) => console.error("Could not load GLB model:", url)
       );
     }
 
 
     // ==========================================
-    // 5. GAMEPLAY & AR FUNCTIONS
+    // 5. GYROSCOPE CAMERA TRACKING (Fixes "Glued to Screen")
+    // ==========================================
+    let gyroEnabled = false;
+
+    function requestGyroPermissions() {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+          .then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientation);
+              gyroEnabled = true;
+            }
+          })
+          .catch(console.error);
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation);
+        gyroEnabled = true;
+      }
+    }
+
+    const deviceEuler = new THREE.Euler();
+    const finalQuaternion = new THREE.Quaternion();
+
+    function handleOrientation(event) {
+      if (!event.alpha && !event.beta) return;
+
+      const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
+      const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
+      const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
+
+      // Orient Three.js camera quaternion according to device motion
+      deviceEuler.set(beta, gamma, -alpha, 'YXZ');
+      camera.quaternion.setFromEuler(deviceEuler);
+    }
+
+
+    // ==========================================
+    // 6. GAMEPLAY & AR FUNCTIONS
     // ==========================================
     let activePokemon = null;
     let pokeballs = [];
@@ -452,7 +520,7 @@
 
     function spawn_pokemon(data, position) {
       const pokedexId = data[0];
-      const modelPath = pokedexId + ".glb"; // E.g., "8.glb"
+      const modelPath = pokedexId + ".glb";
 
       loadNormalizedGLTF(modelPath, (model) => {
         if (activePokemon) scene.remove(activePokemon.mesh);
@@ -461,10 +529,10 @@
         if (position) {
           targetPos.copy(position);
         } else {
-          // 1.4 meters below camera view
+          // Place 2.5 meters forward in current facing direction
           const forward = new THREE.Vector3(0, 0, -2.5).applyQuaternion(camera.quaternion);
           targetPos.copy(camera.position).add(forward);
-          targetPos.y = camera.position.y - 1.4;
+          targetPos.y = camera.position.y - 0.8;
         }
 
         model.position.copy(targetPos);
@@ -513,7 +581,7 @@
           clearInterval(vacuumInterval);
           scene.remove(pokemonMesh);
 
-          // Phase 2: Shake 3 times
+          // Phase 2: Ball Shake 3 times
           if (targetBall) {
             let shakeCount = 0;
             const shakeInterval = setInterval(() => {
@@ -526,7 +594,7 @@
                 // Phase 3: Stars Burst
                 createStarBurst(targetBall.position);
 
-                // Phase 4: Sync to inventory array
+                // Phase 4: Push to inventory & sync
                 inventory.push(data);
                 updateCaughtCounter();
                 if (currentUser && currentPass) {
@@ -576,20 +644,18 @@
       }, 30);
     }
 
+    window.spawn_pokemon = spawn_pokemon;
+    window.throw_pokeball = throw_pokeball;
+    window.catch_pokemon = catch_pokemon;
+
 
     // ==========================================
-    // 6. MOTION / WALKING GYRO SPAWN
+    // 7. MOTION WALKING SPAWN DETECTOR
     // ==========================================
     let lastSpawnTime = 0;
 
-    function requestMotionPermission() {
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        DeviceMotionEvent.requestPermission().catch(() => {});
-      }
-    }
-
     window.addEventListener('devicemotion', (evt) => {
-      if (!currentUser) return; // Only spawn if logged in
+      if (!currentUser) return;
 
       const acc = evt.accelerationIncludingGravity;
       if (!acc) return;
@@ -597,7 +663,6 @@
       const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
       const now = Date.now();
 
-      // Detection threshold & 5-second cooldown
       if (mag > 12.5 && (now - lastSpawnTime > 5000)) {
         lastSpawnTime = now;
         const randomPokedexId = Math.floor(Math.random() * 150) + 1;
@@ -613,7 +678,7 @@
 
 
     // ==========================================
-    // 7. SWIPE TO THROW POKEBALL
+    // 8. SWIPE TO THROW POKEBALL
     // ==========================================
     let touchStartY = 0;
     let touchStartX = 0;
@@ -624,7 +689,7 @@
     });
 
     window.addEventListener('touchend', (e) => {
-      if (!currentUser) return; // Ignore swipes on login screen
+      if (!currentUser) return;
 
       const deltaY = touchStartY - e.changedTouches[0].clientY;
       const deltaX = e.changedTouches[0].clientX - touchStartX;
@@ -642,7 +707,7 @@
 
 
     // ==========================================
-    // 8. RENDER LOOP
+    // 9. THREE.JS RENDER LOOP
     // ==========================================
     const clock = new THREE.Clock();
 
