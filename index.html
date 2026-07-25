@@ -399,21 +399,37 @@ return randomNumber;
     }
 
     async function initSensors() {
-      await initWebcam();
-
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission === 'granted') {
-            window.addEventListener('deviceorientation', handleOrientation, true);
-          }
-        } catch (err) {
-          console.error("Orientation permission error:", err);
-        }
-      } else {
+  // 1. Request orientation permission IMMEDIATELY on click
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const permission = await DeviceOrientationEvent.requestPermission();
+      if (permission === 'granted') {
         window.addEventListener('deviceorientation', handleOrientation, true);
       }
+    } catch (err) {
+      console.error("Orientation permission error:", err);
     }
+  } else {
+    window.addEventListener('deviceorientation', handleOrientation, true);
+  }
+
+  // 2. Request motion permission IMMEDIATELY on click
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const perm = await DeviceMotionEvent.requestPermission();
+      if (perm === 'granted') {
+        window.addEventListener('devicemotion', handleMotion, true);
+      }
+    } catch (e) {
+      console.warn("Motion sensor error:", e);
+    }
+  } else {
+    window.addEventListener('devicemotion', handleMotion, true);
+  }
+
+  // 3. NOW it is safe to wait for the webcam stream!
+  await initWebcam();
+}
 
     // --- STEP-BASED ACCELEROMETER SPAWNER ---
     let stepCount = 0;
