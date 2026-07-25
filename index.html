@@ -15,10 +15,21 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
-      background-color: #111827; /* Dark background instead of transparent */
+      background-color: transparent;
       color: #ffffff;
       user-select: none;
       -webkit-user-select: none;
+    }
+
+    #webcam {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      transform: translate(-50%, -50%);
+      z-index: 0;
     }
 
     /* 3D WebGL Canvas Layer */
@@ -147,7 +158,7 @@
       right: 16px;
       z-index: 10;
       display: flex;
-      justify-content: space-between; /* Fixed typo */
+      justify-content: space-between;
       align-items: center;
       pointer-events: none;
       opacity: 0;
@@ -205,7 +216,7 @@
   </script>
 </head>
 <body>
-<video id="webcam" autoplay playsinline muted style="position: absolute; top: 50%; left: 50%; width: 100vw; height: 100vh; object-fit: cover; transform: translate(-50%, -50%); z-index: 0;"></video>
+  <video id="webcam" autoplay playsinline muted></video>
   <div id="canvas-container"></div>
 
   <div id="login-overlay">
@@ -238,7 +249,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getDatabase, ref, get, child, set, update, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+    import { getDatabase, ref, get, child, set, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -291,29 +302,23 @@
     // =========================================================================
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111827); // Solid color instead of AR
+    // Transparent background for WebAR
+    scene.background = null;
 
-    // Perspective Camera
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 500);
     camera.position.set(0, 0, 0);
 
-    // Add a Grid so you can see your rotation working later
     const gridHelper = new THREE.GridHelper(50, 50, 0x38bdf8, 0x444444);
     gridHelper.position.y = -1.5;
     scene.add(gridHelper);
 
-    // WebGL Renderer
-    // Remove or comment out this line:
-// scene.background = new THREE.Color(0x111827); 
-
-// Update your renderer to be transparent:
-const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setClearColor(0x000000, 0); // Fully transparent clear
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
-    // Scene Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
     scene.add(ambientLight);
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
@@ -343,171 +348,124 @@ const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     }
 
     // =========================================================================
-    // SECTION 3: YOUR DEV PLAYGROUND (3DOF & SPAWNING)
+    // SECTION 3: 3DOF GYROSCOPE, WEBCAM & STEP SPAWNER
     // =========================================================================
-    
-    // --> TODO: Implement your DeviceOrientation logic here
-    // RENDERER THING
+    const videoElement = document.getElementById('webcam');
 
-    // SPAWNING
-
-// Global variable to store active Pokémon data
-function spawn_pokemon() {
-  // If a Pokémon is already active, don't spawn another one
-  if (activePokemon) return;
-
-  // Pick a random ID/Model (e.g., '1.glb', '2.glb', etc., fallback to '8.glb')
-  const randomPikaId = Math.floor(Math.random() * 149) + 1;
-  const modelUrl = `${randomPikaId}.glb`;
-
-  loadNormalizedGLTF(modelUrl, (mesh) => {
-    // 1. Calculate random distance (1m to 5m)
-    const distance = 1 + Math.random() * 4; 
-
-    // 2. Calculate random angle around the user (0 to 360 degrees)
-    const angle = Math.random() * Math.PI * 2;
-
-    // 3. Position relative to camera/user
-    const x = Math.sin(angle) * distance;
-    const z = -Math.cos(angle) * distance; 
-    const y = -0.5; // Place slightly below camera level
-
-    mesh.position.set(camera.position.x + x, y, camera.position.z + z);
-
-    // 4. Set a random Y-axis rotation (facing direction)
-    mesh.rotation.y = Math.random() * Math.PI * 2;
-
-    scene.add(mesh);
-
-    // Set active Pokémon object for collision detection
-    activePokemon = {
-      mesh: mesh,
-      isCatching: false,
-      data: { id: randomPikaId, caughtAt: new Date().toISOString() }
-    };
-  });
-}
-
-let stepCount = 0;
-let lastSpawnTime = 0;
-let lastAccelMagnitude = 0;
-const COOLDOWN_MS = 5000;      // 5-second spawn cooldown
-const STEPS_TO_SPAWN = 4;      // ~4 steps (~3 meters of walking)
-const ACCEL_THRESHOLD = 11.8;  // Acceleration magnitude threshold to trigger 1 step
-
-function handleMotion(event) {
-  const accel = event.accelerationIncludingGravity || event.acceleration;
-  if (!accel || accel.x === null) return;
-
-  // Calculate total acceleration magnitude
-  const mag = Math.sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
-
-  // Peak detection: Detect when motion passes threshold going upward
-  if (mag > ACCEL_THRESHOLD && lastAccelMagnitude <= ACCEL_THRESHOLD) {
-    stepCount++;
-    const now = Date.now();
-
-    // Check if user walked enough steps AND cooldown has passed
-    if (stepCount >= STEPS_TO_SPAWN && (now - lastSpawnTime >= COOLDOWN_MS)) {
-      lastSpawnTime = now;
-      stepCount = 0; // Reset step counter for next spawn
-      spawn_pokemon();
+    async function initWebcam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        videoElement.srcObject = stream;
+        videoElement.play();
+      } catch (err) {
+        console.warn("Camera feed disabled or unavailable:", err);
+      }
     }
-  }
 
-  lastAccelMagnitude = mag;
-}
+    // Quaternion 3DOF Rotation Tracking
+    const euler = new THREE.Euler();
+    const deviceQuaternion = new THREE.Quaternion();
+    const screenTransform = new THREE.Quaternion();
+    const worldTransform = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 
-async function initStepTracker() {
-  // iOS 13+ requires explicit motion permission
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    try {
-      const permission = await DeviceMotionEvent.requestPermission();
-      if (permission === 'granted') {
+    function handleOrientation(event) {
+      const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
+      const beta  = event.beta  ? THREE.MathUtils.degToRad(event.beta)  : 0;
+      const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
+      const orient = window.orientation ? THREE.MathUtils.degToRad(window.orientation) : 0;
+
+      euler.set(beta, alpha, -gamma, 'YXZ');
+      deviceQuaternion.setFromEuler(euler);
+      screenTransform.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -orient);
+
+      camera.quaternion.copy(deviceQuaternion);
+      camera.quaternion.multiply(worldTransform);
+      camera.quaternion.multiply(screenTransform);
+    }
+
+    async function initSensors() {
+      await initWebcam();
+
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation, true);
+          }
+        } catch (err) {
+          console.error("Orientation permission error:", err);
+        }
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+    }
+
+    // --- STEP-BASED ACCELEROMETER SPAWNER ---
+    let stepCount = 0;
+    let lastSpawnTime = 0;
+    let lastAccelMag = 0;
+    const COOLDOWN_MS = 5000;
+    const STEPS_TO_SPAWN = 4;
+    const ACCEL_THRESHOLD = 11.8;
+
+    function handleMotion(event) {
+      const accel = event.accelerationIncludingGravity || event.acceleration;
+      if (!accel || accel.x === null) return;
+
+      const mag = Math.sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
+      if (mag > ACCEL_THRESHOLD && lastAccelMag <= ACCEL_THRESHOLD) {
+        stepCount++;
+        const now = Date.now();
+        if (stepCount >= STEPS_TO_SPAWN && (now - lastSpawnTime >= COOLDOWN_MS)) {
+          lastSpawnTime = now;
+          stepCount = 0;
+          spawn_pokemon();
+        }
+      }
+      lastAccelMag = mag;
+    }
+
+    async function initStepTracker() {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const perm = await DeviceMotionEvent.requestPermission();
+          if (perm === 'granted') window.addEventListener('devicemotion', handleMotion, true);
+        } catch (e) { console.warn("Motion sensor error:", e); }
+      } else {
         window.addEventListener('devicemotion', handleMotion, true);
       }
-    } catch (err) {
-      console.warn("Motion permission rejected:", err);
     }
-  } else {
-    // Android / standard Web
-    window.addEventListener('devicemotion', handleMotion, true);
-  }
-}
 
+    // --- RANDOM SPAWN FUNCTION (1-5m RADIUS) ---
+    function spawn_pokemon() {
+      if (activePokemon) return;
 
-// =========================================================================
-// SECTION 3: 3DOF GYROSCOPE & WEBCAM AR INTEGRATION
-// =========================================================================
-// PASTE THIS IN THE BLOCK 3
-const videoElement = document.getElementById('webcam');
+      const randomPikaId = Math.floor(Math.random() * 8) + 1;
+      const modelUrl = `${randomPikaId}.glb`;
 
-// 3. - 1 Initialize the background camera feed
-async function initWebcam() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false
-    });
-    videoElement.srcObject = stream;
-    videoElement.play();
-  } catch (err) {
-    console.warn("Camera access denied or unavailable.", err);
-  }
-}
+      loadNormalizedGLTF(modelUrl, (mesh) => {
+        const distance = 1 + Math.random() * 4; // 1m to 5m radius
+        const angle = Math.random() * Math.PI * 2; // Random 360 direction
 
-// 3. - 2 Quaternion Math for 3DOF Tracking
-const euler = new THREE.Euler();
-const deviceQuaternion = new THREE.Quaternion();
-const screenTransform = new THREE.Quaternion();
-// This specific transform aligns the phone's IMU coordinate system with Three.js's coordinate system
-const worldTransform = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); 
+        const x = Math.sin(angle) * distance;
+        const z = -Math.cos(angle) * distance;
+        const y = -0.5;
 
-function handleOrientation(event) {
-  if (event.alpha === null || event.beta === null) return;
+        mesh.position.set(camera.position.x + x, y, camera.position.z + z);
+        mesh.rotation.y = Math.random() * Math.PI * 2; // Random orientation
 
-  // Convert raw degrees to radians
-  const alpha = THREE.MathUtils.degToRad(event.alpha); // Z-axis (Compass)
-  const beta  = THREE.MathUtils.degToRad(event.beta);  // X-axis (Pitch)
-  const gamma = THREE.MathUtils.degToRad(event.gamma); // Y-axis (Roll)
-  
-  // Account for the screen orientation (portrait vs landscape)
-  const orient = window.orientation ? THREE.MathUtils.degToRad(window.orientation) : 0;
+        scene.add(mesh);
 
-  // Mobile devices apply rotations in YXZ order
-  euler.set(beta, alpha, -gamma, 'YXZ');
-  deviceQuaternion.setFromEuler(euler);
-  screenTransform.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -orient);
-
-  // Apply the calculated rotation to the Three.js camera
-  camera.quaternion.copy(deviceQuaternion);
-  camera.quaternion.multiply(worldTransform);
-  camera.quaternion.multiply(screenTransform);
-}
-
-// 3. - 3 Request Permissions and Start Sensors
-async function initSensors() {
-  console.log("Initializing 3DOF Sensors and AR Camera...");
-  
-  await initWebcam();
-
-  // iOS 13+ requires explicit permission for device orientation
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    try {
-      const permission = await DeviceOrientationEvent.requestPermission();
-      if (permission === 'granted') {
-        window.addEventListener('deviceorientation', handleOrientation, true);
-      } else {
-        alert("Gyroscope permission denied. The 3D world will not track your movement.");
-      }
-    } catch (err) {
-      console.error("Error requesting device orientation permission:", err);
+        activePokemon = {
+          mesh: mesh,
+          isCatching: false,
+          data: { id: randomPikaId, caughtAt: new Date().toISOString() }
+        };
+      });
     }
-  } else {
-    // Android / Older iOS
-    window.addEventListener('deviceorientation', handleOrientation, true);
-  }
-}
 
     // =========================================================================
     // SECTION 4: POKÉBALL PHYSICS & VACUUM CATCH
@@ -653,8 +611,9 @@ async function initSensors() {
     }
 
     async function handleSubmit() {
-      await initSensors(); // Re-injected as a promise-based starter
-      await initStepTracker(); // <--- Add this line here
+      await initSensors();
+      await initStepTracker();
+
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value.trim();
       const statusEl = document.getElementById('auth-status');
@@ -672,8 +631,8 @@ async function initSensors() {
         document.getElementById('user-display').innerText = u;
         document.getElementById('caught-count').innerText = inventory.length;
 
-        // Manual spawn test
-        setTimeout(() => spawn_pokemon([1, 0, 0, 0]), 800);
+        // Spawn first testing Pokemon
+        setTimeout(() => spawn_pokemon(), 800);
 
         syncIntervalId = setInterval(() => {
           if (currentUser && currentPass) update_inventory(currentUser, currentPass, inventory);
@@ -694,18 +653,6 @@ async function initSensors() {
     document.getElementById('tab-signup').addEventListener('click', () => switchMode('signup'));
     document.getElementById('action-btn').addEventListener('click', handleSubmit);
     document.getElementById('exit-btn').addEventListener('click', handleLogout);
-
   </script>
-
-
-<script>
-
-
-
-var random_thing = " Paste this block into Section 3 (replacing the empty initSensors stub). This handles the WebRTC camera feed, the iOS permissions, and the complex Quaternion math required to map the phone's physical rotation directly to the Three.js camera.";
-// RENDERER THING
-
-
-</script>
 </body>
 </html>
