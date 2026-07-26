@@ -448,6 +448,7 @@
         <h1 id="inspect-name">Loading...</h1>
         <div class="hp-bar-container">
           <div class="hp-bar"></div>
+          <div class="hp-text" id="inspect-hp">-- / --</div>
         </div>
         
 
@@ -1144,7 +1145,9 @@
       document.getElementById('inspect-name').innerText = pkmn.name;
       document.getElementById('inspect-weight').innerText = `${pkmn.weight}kg`;
       document.getElementById('inspect-height').innerText = `${pkmn.height}m`;
-      
+      // Example inside your inspection rendering logic:
+      const sta = pkmn.baseStats.stamina; // Or your calculated HP
+      document.getElementById('inspect-hp').innerText = `${sta} HP`;
       const typesContainer = document.getElementById('inspect-types');
       typesContainer.innerHTML = pkmn.types.map(t => `<span style="font-size:12px; font-weight:bold; color:#0284c7;">${t}</span>`).join('');
       
