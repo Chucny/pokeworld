@@ -395,6 +395,35 @@
   </style>
 </head>
 <body>
+
+<div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 99999; display: flex; justify-content: center; align-items: center; transition: opacity 0.8s ease;">
+  <img src="loading screen.webp" alt="Loading Screen" style="width: 100%; height: 100%; object-fit: contain;" />
+</div>
+
+<audio id="loading-audio" src="load-sound.mp3"></audio>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+  const loadingScreen = document.getElementById('loading-screen');
+  const loadingAudio = document.getElementById('loading-audio');
+
+  // Play the loading sound (wrapped in a try/catch or user-interaction check if browsers block autoplay)
+  loadingAudio.play().catch(error => {
+    console.log("Audio autoplay was prevented by browser policy:", error);
+  });
+
+  // Hide the loading screen after 4 seconds (adjust time in milliseconds as needed)
+  setTimeout(() => {
+    loadingScreen.style.opacity = '0';
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+    }, 800); // Matches the CSS transition duration
+  }, 4000);
+});
+</script>
+
+
+
+
   <video id="webcam" autoplay playsinline muted></video>
   <div id="canvas-container"></div>
 
