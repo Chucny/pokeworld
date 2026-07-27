@@ -392,74 +392,6 @@
     .move-name { font-weight: 600; color: #334155; font-size: 14px; }
     .move-type { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-top: 2px; }
     .move-power { font-weight: 700; color: #0f172a; font-size: 15px; }
-    /* Pokeball HUD Icon Style */
-    /* Updated Pokeball HUD Icon (Red top, White bottom) */
-#inventory-btn {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  border: 3px solid #ffffff;
-  
-  /* Red top (0-46%), Black band (46-54%), White bottom (54-100%) */
-  background: linear-gradient(
-    to bottom,
-    #ef4444 0%,
-    #ef4444 46%,
-    #212121 46%,
-    #212121 54%,
-    #ffffff 54%,
-    #ffffff 100%
-  );
-  
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  overflow: hidden;
-  transition: transform 0.1s ease;
-}
-
-#inventory-btn:active {
-  transform: scale(0.92);
-}
-
-/* Center Pokeball Button */
-#inventory-btn::after {
-  content: '';
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border: 4px solid #212121;
-  border-radius: 50%;
-  z-index: 2;
-  box-shadow: 0 0 0 2px #ffffff;
-}
-
-    /* Updated Inventory Slot Style (PoGO style with HP) */
-    .inventory-slot .p-hp {
-      font-size: 11px;
-      color: #10b981; 
-      font-weight: 700;
-      margin-top: 4px;
-      background: #ecfdf5;
-      padding: 2px 6px;
-      border-radius: 8px;
-    }
-    .inventory-slot img {
-      width: 70px;
-      height: 70px;
-      object-fit: contain;
-    }
-    .inventory-slot span.p-name {
-      color: #334155;
-      font-weight: 700;
-      font-size: 12px;
-      margin-top: 4px;
-    }
   </style>
 </head>
 <body>
@@ -485,7 +417,7 @@
     setTimeout(() => {
       loadingScreen.style.display = 'none';
     }, 800); // Matches the CSS transition duration
-  }, 6000);
+  }, 4000);
 });
 </script>
 
@@ -514,11 +446,14 @@
   </div>
 
   <div id="game-hud">
-    <div id="inventory-btn" title="Open Inventory"></div>
-    
+    <div class="hud-pill">
+      <span class="sync-indicator" id="sync-dot"></span>
+      <span style="opacity: 1.0;" id="user-display">Trainer</span>
+      <span style="opacity: 1.0;">|</span>
+      <span style="opacity: 1.0; cursor: pointer;" id="inventory-btn">Pokemon Inventory ┃ <strong id="caught-count" style="color: #0284c7;">0</strong></span>
+    </div>
     <button class="hud-btn-exit" id="exit-btn">Exit</button>
   </div>
-    
 
   <div id="inventory-overlay" class="ui-overlay hidden">
     <div class="inventory-header">
@@ -1210,19 +1145,14 @@
 
       inventory.forEach((pokemonData, index) => {
         const pokeId = pokemonData[0];
-        // Ensure we have a fallback for baseStats if it's missing
-        const pkmn = gm.pokemon[pokeId] || { name: `Unknown #${pokeId}`, baseStats: { stamina: '??' } };
+        const pkmn = gm.pokemon[pokeId] || { name: `Unknown #${pokeId}` };
         const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokeId}.png`;
-        
-        // Pull HP (stamina) from GameMaster data
-        const hp = pkmn.baseStats ? pkmn.baseStats.stamina : '??';
 
         const slot = document.createElement('div');
         slot.className = 'inventory-slot';
         slot.innerHTML = `
-          <img src="${spriteUrl}" alt="${pkmn.name}">
-          <span class="p-name">${pkmn.name}</span>
-          <div class="p-hp">HP ${hp}</div>
+          <img src="${spriteUrl}" alt="${pkmn.name}" style="width: 60px; height: 60px;">
+          <span style="font-size: 10px; margin-top: 2px;">${pkmn.name}</span>
         `;
         slot.addEventListener('click', () => {
           document.getElementById('inventory-overlay').classList.add('hidden');
