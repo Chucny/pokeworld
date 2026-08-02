@@ -428,9 +428,38 @@
   <div id="canvas-container"></div>
 
   <div id="login-overlay">
+    <!-- HTML-osuus -->
+
     <div class="login-card">
+<img 
+  src="logo.png" 
+  alt="Peli-logo" 
+  class="pixel-logo"
+/><br>
+
+<style>
+.pixel-logo {
+  width: 140px;
+  height: 140px;
+  
+  /* Korjaus: Irrotetaan logo flex-rivistä ja pakotetaan se kortin ylle */
+  position: absolute;
+  transform: translate(-50%, -100%);
+  left: 50%;
+  
+  /* Pitää pikselit terävinä */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Varmistetaan, että login-card toimii logon ankkurina */
+.login-card {
+  position: relative;
+}
+</style>
+
       <h1 class="brand-title">POKEWORLD</h1>
-      <p class="brand-subtitle">Login to test environment</p>
+      <p class="brand-subtitle">Login to Pokeworld</p>
 
       <div class="tab-group">
         <button class="tab-btn active" id="tab-login">Login</button>
