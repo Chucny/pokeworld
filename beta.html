@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Pokeworld</title>
@@ -41,7 +42,6 @@
       z-index: 0;
     }
 
-    /* 3D WebGL Canvas Layer */
     #canvas-container {
       position: absolute;
       top: 0;
@@ -52,7 +52,6 @@
       pointer-events: none;
     }
 
-    /* Login & Account Overlay (Light Mode) */
     #login-overlay {
       position: fixed;
       top: 0;
@@ -84,6 +83,7 @@
       padding: 24px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.1);
       text-align: center;
+      position: relative;
     }
 
     .brand-title {
@@ -163,7 +163,6 @@
       color: #dc2626;
     }
 
-    /* Game HUD Overlay (Light Mode) */
     #game-hud {
       position: absolute;
       top: 16px;
@@ -180,21 +179,6 @@
     #game-hud.visible {
       opacity: 1;
       pointer-events: auto;
-    }
-
-    .hud-pill {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(8px);
-      border: 1px solid #cbd5e1;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-      padding: 8px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #334155;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     .hud-btn-exit {
@@ -219,7 +203,6 @@
       background: #d97706;
     }
 
-    /* INVENTORY & INSPECTION UI STYLES (Light Mode) */
     .ui-overlay {
       position: fixed;
       top: 0; left: 0;
@@ -233,7 +216,6 @@
       display: none !important;
     }
 
-    /* Inventory Grid */
     #inventory-overlay {
       background: #f8fafc;
       padding: 20px;
@@ -267,7 +249,6 @@
       font-weight: 600;
     }
 
-    /* PoGO Style Inspection Card */
     .pogo-card {
       width: 100%;
       height: 100%;
@@ -309,21 +290,75 @@
       justify-content: center;
       align-items: center;
       flex-shrink: 0;
+      overflow: hidden;
     }
     model-viewer {
       width: 100%;
       height: 100%;
       --poster-color: transparent;
+      transition: filter 0.3s ease, transform 0.3s ease;
     }
-    .cp-header {
+
+    /* Storm Evolution Visual Effects */
+    #storm-overlay {
       position: absolute;
-      top: 25px;
-      font-size: 28px;
-      font-weight: 500;
-      color: white;
-      z-index: 10;
-      margin: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 15;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle, rgba(15, 23, 42, 0.4) 0%, rgba(2, 132, 199, 0.8) 100%);
     }
+    #storm-overlay.active {
+      opacity: 1;
+    }
+
+    .storm-vortex {
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      border: 4px dashed rgba(56, 189, 248, 0.8);
+      box-shadow: 0 0 35px rgba(129, 140, 248, 0.9), inset 0 0 25px rgba(56, 189, 248, 0.8);
+      animation: spinVortex 1s linear infinite;
+    }
+    .storm-vortex-inner {
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      border: 3px dotted rgba(255, 255, 255, 0.9);
+      animation: spinVortexRev 0.6s linear infinite;
+    }
+
+    .lightning-flash {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .lightning-flash.flash {
+      animation: flashAnim 0.15s ease-in-out 4;
+    }
+
+    @keyframes spinVortex {
+      0% { transform: rotate(0deg) scale(0.8); }
+      50% { transform: rotate(180deg) scale(1.1); }
+      100% { transform: rotate(360deg) scale(0.8); }
+    }
+    @keyframes spinVortexRev {
+      0% { transform: rotate(360deg) scale(1.1); }
+      100% { transform: rotate(0deg) scale(0.9); }
+    }
+    @keyframes flashAnim {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 0.85; }
+    }
+
     .pogo-data-sheet {
       background: #ffffff;
       border-radius: 30px 30px 0 0;
@@ -331,6 +366,8 @@
       padding: 20px;
       color: #1e293b;
       text-align: center;
+      display: flex;
+      flex-direction: column;
     }
     #inspect-name {
       font-size: 28px;
@@ -392,7 +429,84 @@
     .move-name { font-weight: 600; color: #334155; font-size: 14px; }
     .move-type { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-top: 2px; }
     .move-power { font-weight: 700; color: #0f172a; font-size: 15px; }
+
+    #pokeball-main-btn {
+      width: 60px;
+      height: 60px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.2s ease;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+    }
+    #pokeball-main-btn:active {
+      transform: scale(0.9);
+    }
+
+    .menu-card {
+      width: 90%;
+      max-width: 320px;
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 24px;
+      margin: auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .menu-btn {
+      width: 100%;
+      padding: 14px;
+      margin: 6px 0;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .menu-btn:hover {
+      background: #f1f5f9;
+    }
+    .pixel-logo {
+      width: 140px;
+      height: 140px;
+      position: absolute;
+      transform: translate(-50%, -100%);
+      left: 50%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .evolve-btn-action {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      border: none;
+      padding: 14px;
+      margin-top: 15px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+      transition: transform 0.1s ease, opacity 0.2s ease;
+    }
+    .evolve-btn-action:active {
+      transform: scale(0.98);
+    }
+    .evolve-btn-action:disabled {
+      background: #cbd5e1;
+      color: #64748b;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
   </style>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
@@ -403,34 +517,30 @@
 <audio id="loading-audio" src="load-sound.mp3"></audio>
 <script>
   window.addEventListener('DOMContentLoaded', () => {
-  const loadingScreen = document.getElementById('loading-screen');
-  const loadingAudio = document.getElementById('loading-audio');
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingAudio = document.getElementById('loading-audio');
 
-  // Play the loading sound (wrapped in a try/catch or user-interaction check if browsers block autoplay)
-  loadingAudio.play().catch(error => {
-    console.log("Audio autoplay was prevented by browser policy:", error);
-  });
+    loadingAudio.play().catch(error => {
+      console.log("Audio autoplay was prevented by browser policy:", error);
+    });
 
-  // Hide the loading screen after 4 seconds (adjust time in milliseconds as needed)
-  setTimeout(() => {
-    loadingScreen.style.opacity = '0';
     setTimeout(() => {
-      loadingScreen.style.display = 'none';
-    }, 800); // Matches the CSS transition duration
-  }, 4000);
-});
+      loadingScreen.style.opacity = '0';
+      setTimeout(() => {
+        loadingScreen.style.display = 'none';
+      }, 800);
+    }, 4000);
+  });
 </script>
-
-
-
 
   <video id="webcam" autoplay playsinline muted></video>
   <div id="canvas-container"></div>
 
   <div id="login-overlay">
     <div class="login-card">
+      <img src="logo.png" alt="Peli-logo" class="pixel-logo"/><br>
       <h1 class="brand-title">POKEWORLD</h1>
-      <p class="brand-subtitle">Login to test environment</p>
+      <p class="brand-subtitle">Login to Pokeworld</p>
 
       <div class="tab-group">
         <button class="tab-btn active" id="tab-login">Login</button>
@@ -446,13 +556,40 @@
   </div>
 
   <div id="game-hud">
-    <div class="hud-pill">
-      <span class="sync-indicator" id="sync-dot"></span>
-      <span style="opacity: 1.0;" id="user-display">Trainer</span>
-      <span style="opacity: 1.0;">|</span>
-      <span style="opacity: 1.0; cursor: pointer;" id="inventory-btn">Caught: <strong id="caught-count" style="color: #0284c7;">0</strong></span>
+    <button id="pokeball-main-btn" aria-label="Menu">
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        <circle cx="50" cy="50" r="46" fill="#ffffff" stroke="#94a3b8" stroke-width="6"/>
+        <path d="M 4 50 A 46 46 0 0 1 96 50 Z" fill="#ef4444"/>
+        <line x1="4" y1="50" x2="96" y2="50" stroke="#475569" stroke-width="6"/>
+        <circle cx="50" cy="50" r="14" fill="#ffffff" stroke="#475569" stroke-width="5"/>
+        <circle cx="50" cy="50" r="8" fill="#94a3b8"/>
+      </svg>
+    </button>
+    <span class="sync-indicator" id="sync-dot"></span>
+  </div>
+
+  <div id="action-menu-overlay" class="ui-overlay hidden">
+    <div class="menu-card">
+      <button class="menu-btn" id="menu-inventory-btn">🎒 Inventory (<span id="caught-count">0</span>)</button>
+      <button class="menu-btn" id="menu-trade-btn">🔄 Trade Pokémon</button>
+      <button class="hud-btn-exit" id="exit-btn" style="width: 100%; margin-top: 10px;">Exit Game</button>
+      <button class="close-btn" id="close-menu-btn" style="position: relative; top: 0; right: 0; margin-top: 15px;">✕</button>
     </div>
-    <button class="hud-btn-exit" id="exit-btn">Exit</button>
+  </div>
+
+  <div id="trade-overlay" class="ui-overlay hidden">
+    <div class="menu-card">
+      <h2>Pokémon Trading</h2>
+      <p id="trade-status" style="font-size: 13px; color: #64748b;">Select a Pokémon to offer</p>
+      
+      <div id="trade-offer-box" style="margin: 15px 0; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 12px;">
+        <span id="offered-pokemon-name" style="font-weight: bold;">No Pokémon Selected</span>
+      </div>
+
+      <button id="select-trade-pokemon-btn" class="submit-btn" style="margin-bottom: 8px;">Select Pokémon</button>
+      <button id="send-trade-offer-btn" class="submit-btn" style="background: #16a34a; display: none;">Publish Offer</button>
+      <button class="hud-btn-exit" id="close-trade-btn" style="width: 100%; margin-top: 10px;">Cancel</button>
+    </div>
   </div>
 
   <div id="inventory-overlay" class="ui-overlay hidden">
@@ -469,7 +606,11 @@
       <button class="close-btn" id="close-inspection-btn">✕</button>
       
       <div class="model-container">
-        
+        <div id="storm-overlay">
+          <div class="storm-vortex"></div>
+          <div class="storm-vortex-inner"></div>
+        </div>
+        <div class="lightning-flash" id="lightning-flash"></div>
         <model-viewer id="inspect-model" alt="Pokemon" auto-rotate camera-controls shadow-intensity="1" ar></model-viewer>
       </div>
 
@@ -479,7 +620,6 @@
           <div class="hp-bar"></div>
           <div class="hp-text" id="inspect-hp">-- / --</div>
         </div>
-        
 
         <div class="metrics-row">
           <div class="metric">
@@ -516,6 +656,8 @@
             <div class="move-power" id="move3-power">--</div>
           </div>
         </div>
+
+        <button id="evolve-btn" class="evolve-btn-action">Evolve</button>
       </div>
     </div>
   </div>
@@ -528,7 +670,14 @@
 
     let gm = { pokemon: {}, moves: {} };
 
-    // Fetch GameMaster JSON on startup
+    const finalEvos = new Set([
+      3, 6, 9, 12, 15, 18, 20, 22, 24, 26, 28, 31, 34, 36, 38, 40, 42, 45, 47, 49,
+      51, 53, 55, 57, 59, 62, 65, 68, 71, 73, 76, 78, 80, 82, 83, 85, 87, 89, 91,
+      94, 95, 97, 99, 101, 103, 105, 106, 107, 108, 110, 112, 113, 114, 115, 117,
+      119, 121, 122, 123, 124, 125, 126, 127, 128, 130, 131, 132, 134, 135, 136,
+      137, 139, 141, 142, 143, 144, 145, 146, 149, 150, 151
+    ]);
+
     async function loadGameMaster() {
       try {
         const response = await fetch('gamemaster.json');
@@ -536,230 +685,54 @@
           gm = await response.json();
         }
       } catch (e) {
-          gm = {
-  
-  "pokemon": {
-    "1": { "name": "Bulbasaur", "weight": "6.9", "height": "0.7", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 118, "defense": 111, "stamina": 128 } },
-    "2": { "name": "Ivysaur", "weight": "13.0", "height": "1.0", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 28], "baseStats": { "attack": 151, "defense": 143, "stamina": 155 } },
-    "3": { "name": "Venusaur", "weight": "100.0", "height": "2.0", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 29], "baseStats": { "attack": 198, "defense": 189, "stamina": 190 } },
-    "4": { "name": "Charmander", "weight": "8.5", "height": "0.6", "types": ["Fire"], "fastMoves": [3, 4], "chargeMoves": [30, 31], "baseStats": { "attack": 116, "defense": 93, "stamina": 118 } },
-    "5": { "name": "Charmeleon", "weight": "19.0", "height": "1.1", "types": ["Fire"], "fastMoves": [3, 4], "chargeMoves": [30, 32], "baseStats": { "attack": 158, "defense": 126, "stamina": 151 } },
-    "6": { "name": "Charizard", "weight": "90.5", "height": "1.7", "types": ["Fire", "Flying"], "fastMoves": [3, 5], "chargeMoves": [30, 33], "baseStats": { "attack": 223, "defense": 173, "stamina": 186 } },
-    "7": { "name": "Squirtle", "weight": "9.0", "height": "0.5", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 94, "defense": 121, "stamina": 127 } },
-    "8": { "name": "Wartortle", "weight": "22.5", "height": "1.0", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 36], "baseStats": { "attack": 126, "defense": 155, "stamina": 153 } },
-    "9": { "name": "Blastoise", "weight": "85.5", "height": "1.6", "types": ["Water"], "fastMoves": [6, 8], "chargeMoves": [34, 37], "baseStats": { "attack": 171, "defense": 207, "stamina": 190 } },
-    "10": { "name": "Caterpie", "weight": "2.9", "height": "0.3", "types": ["Bug"], "fastMoves": [9], "chargeMoves": [38], "baseStats": { "attack": 55, "defense": 55, "stamina": 128 } },
-    "11": { "name": "Metapod", "weight": "9.9", "height": "0.7", "types": ["Bug"], "fastMoves": [9], "chargeMoves": [38], "baseStats": { "attack": 45, "defense": 80, "stamina": 137 } },
-    "12": { "name": "Butterfree", "weight": "32.0", "height": "1.1", "types": ["Bug", "Flying"], "fastMoves": [10, 11], "chargeMoves": [39, 40], "baseStats": { "attack": 167, "defense": 137, "stamina": 155 } },
-    "13": { "name": "Weedle", "weight": "3.2", "height": "0.3", "types": ["Bug", "Poison"], "fastMoves": [9], "chargeMoves": [38], "baseStats": { "attack": 63, "defense": 50, "stamina": 120 } },
-    "14": { "name": "Kakuna", "weight": "10.0", "height": "0.6", "types": ["Bug", "Poison"], "fastMoves": [9], "chargeMoves": [38], "baseStats": { "attack": 46, "defense": 75, "stamina": 128 } },
-    "15": { "name": "Beedrill", "weight": "29.5", "height": "1.0", "types": ["Bug", "Poison"], "fastMoves": [10, 12], "chargeMoves": [41, 42], "baseStats": { "attack": 169, "defense": 130, "stamina": 163 } },
-    "16": { "name": "Pidgey", "weight": "1.8", "height": "0.3", "types": ["Normal", "Flying"], "fastMoves": [13, 14], "chargeMoves": [43, 44], "baseStats": { "attack": 85, "defense": 73, "stamina": 120 } },
-    "17": { "name": "Pidgeotto", "weight": "30.0", "height": "1.1", "types": ["Normal", "Flying"], "fastMoves": [13, 14], "chargeMoves": [43, 44], "baseStats": { "attack": 117, "defense": 105, "stamina": 160 } },
-    "18": { "name": "Pidgeot", "weight": "39.5", "height": "1.5", "types": ["Normal", "Flying"], "fastMoves": [13, 15], "chargeMoves": [43, 45], "baseStats": { "attack": 166, "defense": 154, "stamina": 195 } },
-    "19": { "name": "Rattata", "weight": "3.5", "height": "0.3", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 103, "defense": 70, "stamina": 102 } },
-    "20": { "name": "Raticate", "weight": "18.5", "height": "0.7", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 47], "baseStats": { "attack": 161, "defense": 139, "stamina": 146 } },
-    "21": { "name": "Spearow", "weight": "2.0", "height": "0.3", "types": ["Normal", "Flying"], "fastMoves": [13, 14], "chargeMoves": [43, 44], "baseStats": { "attack": 112, "defense": 60, "stamina": 120 } },
-    "22": { "name": "Fearow", "weight": "38.0", "height": "1.2", "types": ["Normal", "Flying"], "fastMoves": [13, 15], "chargeMoves": [43, 45], "baseStats": { "attack": 182, "defense": 133, "stamina": 163 } },
-    "23": { "name": "Ekans", "weight": "6.9", "height": "2.0", "types": ["Poison"], "fastMoves": [17, 18], "chargeMoves": [48, 49], "baseStats": { "attack": 110, "defense": 97, "stamina": 111 } },
-    "24": { "name": "Arbok", "weight": "65.0", "height": "3.5", "types": ["Poison"], "fastMoves": [17, 18], "chargeMoves": [48, 50], "baseStats": { "attack": 167, "defense": 153, "stamina": 155 } },
-    "25": { "name": "Pikachu", "weight": "6.0", "height": "0.4", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 22], "baseStats": { "attack": 112, "defense": 96, "stamina": 111 } },
-    "26": { "name": "Raichu", "weight": "30.0", "height": "0.8", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 193, "defense": 151, "stamina": 155 } },
-    "27": { "name": "Sandshrew", "weight": "12.0", "height": "0.6", "types": ["Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 126, "defense": 120, "stamina": 137 } },
-    "28": { "name": "Sandslash", "weight": "29.5", "height": "1.0", "types": ["Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 177, "defense": 171, "stamina": 181 } },
-    "29": { "name": "Nidoran (F)", "weight": "7.0", "height": "0.4", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 86, "defense": 89, "stamina": 146 } },
-    "30": { "name": "Nidorina", "weight": "20.0", "height": "0.8", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 117, "defense": 120, "stamina": 172 } },
-    "31": { "name": "Nidoqueen", "weight": "60.0", "height": "1.3", "types": ["Poison", "Ground"], "fastMoves": [1, 16], "chargeMoves": [48, 25], "baseStats": { "attack": 180, "defense": 173, "stamina": 207 } },
-    "32": { "name": "Nidoran (M)", "weight": "9.0", "height": "0.5", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 92, "defense": 77, "stamina": 130 } },
-    "33": { "name": "Nidorino", "weight": "19.5", "height": "0.9", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 137, "defense": 111, "stamina": 162 } },
-    "34": { "name": "Nidoking", "weight": "62.0", "height": "1.4", "types": ["Poison", "Ground"], "fastMoves": [3, 16], "chargeMoves": [30, 25], "baseStats": { "attack": 204, "defense": 156, "stamina": 190 } },
-    "35": { "name": "Clefairy", "weight": "7.5", "height": "0.6", "types": ["Fairy"], "fastMoves": [13, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 107, "defense": 108, "stamina": 172 } },
-    "36": { "name": "Clefable", "weight": "40.0", "height": "1.3", "types": ["Fairy"], "fastMoves": [13, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 178, "defense": 162, "stamina": 216 } },
-    "37": { "name": "Vulpix", "weight": "9.9", "height": "0.6", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 96, "defense": 109, "stamina": 116 } },
-    "38": { "name": "Ninetales", "weight": "19.9", "height": "1.1", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 169, "defense": 190, "stamina": 177 } },
-    "39": { "name": "Jigglypuff", "weight": "5.5", "height": "0.5", "types": ["Normal", "Fairy"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 80, "defense": 41, "stamina": 251 } },
-    "40": { "name": "Wigglytuff", "weight": "12.0", "height": "1.0", "types": ["Normal", "Fairy"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 156, "defense": 90, "stamina": 295 } },
-    "41": { "name": "Zubat", "weight": "7.5", "height": "0.8", "types": ["Poison", "Flying"], "fastMoves": [17, 14], "chargeMoves": [48, 44], "baseStats": { "attack": 83, "defense": 73, "stamina": 120 } },
-    "42": { "name": "Golbat", "weight": "55.0", "height": "1.6", "types": ["Poison", "Flying"], "fastMoves": [17, 14], "chargeMoves": [48, 44], "baseStats": { "attack": 161, "defense": 150, "stamina": 181 } },
-    "43": { "name": "Oddish", "weight": "5.4", "height": "0.5", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 131, "defense": 112, "stamina": 128 } },
-    "44": { "name": "Gloom", "weight": "8.6", "height": "0.8", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 153, "defense": 136, "stamina": 155 } },
-    "45": { "name": "Vileplume", "weight": "18.6", "height": "1.2", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 29], "baseStats": { "attack": 202, "defense": 167, "stamina": 181 } },
-    "46": { "name": "Paras", "weight": "5.4", "height": "0.3", "types": ["Bug", "Grass"], "fastMoves": [1, 9], "chargeMoves": [26, 38], "baseStats": { "attack": 121, "defense": 99, "stamina": 111 } },
-    "47": { "name": "Parasect", "weight": "29.5", "height": "1.0", "types": ["Bug", "Grass"], "fastMoves": [1, 9], "chargeMoves": [26, 38], "baseStats": { "attack": 165, "defense": 139, "stamina": 155 } },
-    "48": { "name": "Venonat", "weight": "30.0", "height": "1.0", "types": ["Bug", "Poison"], "fastMoves": [9, 17], "chargeMoves": [38, 48], "baseStats": { "attack": 100, "defense": 100, "stamina": 155 } },
-    "49": { "name": "Venomoth", "weight": "12.5", "height": "1.5", "types": ["Bug", "Poison"], "fastMoves": [9, 17], "chargeMoves": [38, 48], "baseStats": { "attack": 179, "defense": 143, "stamina": 172 } },
-    "50": { "name": "Diglett", "weight": "0.8", "height": "0.2", "types": ["Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 109, "defense": 78, "stamina": 67 } },
-    "51": { "name": "Dugtrio", "weight": "33.3", "height": "0.7", "types": ["Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 167, "defense": 134, "stamina": 111 } },
-    "52": { "name": "Meowth", "weight": "4.2", "height": "0.4", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 92, "defense": 78, "stamina": 120 } },
-    "53": { "name": "Persian", "weight": "32.0", "height": "1.0", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 150, "defense": 136, "stamina": 163 } },
-    "54": { "name": "Psyduck", "weight": "19.6", "height": "0.8", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 122, "defense": 95, "stamina": 137 } },
-    "55": { "name": "Golduck", "weight": "76.6", "height": "1.7", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 191, "defense": 162, "stamina": 190 } },
-    "56": { "name": "Mankey", "weight": "28.0", "height": "0.5", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 148, "defense": 82, "stamina": 120 } },
-    "57": { "name": "Primeape", "weight": "32.0", "height": "1.0", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 207, "defense": 138, "stamina": 163 } },
-    "58": { "name": "Growlithe", "weight": "19.0", "height": "0.7", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 136, "defense": 93, "stamina": 146 } },
-    "59": { "name": "Arcanine", "weight": "155.0", "height": "1.9", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 227, "defense": 166, "stamina": 207 } },
-    "60": { "name": "Poliwag", "weight": "12.4", "height": "0.6", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 101, "defense": 82, "stamina": 120 } },
-    "61": { "name": "Poliwhirl", "weight": "20.0", "height": "1.0", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 130, "defense": 123, "stamina": 163 } },
-    "62": { "name": "Poliwrath", "weight": "54.0", "height": "1.3", "types": ["Water", "Fighting"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 182, "defense": 184, "stamina": 207 } },
-    "63": { "name": "Abra", "weight": "19.5", "height": "0.9", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 195, "defense": 82, "stamina": 93 } },
-    "64": { "name": "Kadabra", "weight": "56.5", "height": "1.3", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 232, "defense": 117, "stamina": 120 } },
-    "65": { "name": "Alakazam", "weight": "48.0", "height": "1.5", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 271, "defense": 167, "stamina": 146 } },
-    "66": { "name": "Machop", "weight": "19.5", "height": "0.8", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 137, "defense": 82, "stamina": 172 } },
-    "67": { "name": "Machoke", "weight": "70.5", "height": "1.5", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 177, "defense": 125, "stamina": 190 } },
-    "68": { "name": "Machamp", "weight": "130.0", "height": "1.6", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 234, "defense": 159, "stamina": 207 } },
-    "69": { "name": "Bellsprout", "weight": "4.0", "height": "0.7", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 139, "defense": 61, "stamina": 137 } },
-    "70": { "name": "Weepinbell", "weight": "6.4", "height": "1.0", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 172, "defense": 92, "stamina": 163 } },
-    "71": { "name": "Victreebel", "weight": "15.5", "height": "1.7", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 29], "baseStats": { "attack": 207, "defense": 135, "stamina": 190 } },
-    "72": { "name": "Tentacool", "weight": "45.5", "height": "0.9", "types": ["Water", "Poison"], "fastMoves": [6, 17], "chargeMoves": [34, 48], "baseStats": { "attack": 106, "defense": 136, "stamina": 120 } },
-    "73": { "name": "Tentacruel", "weight": "55.0", "height": "1.6", "types": ["Water", "Poison"], "fastMoves": [6, 17], "chargeMoves": [34, 48], "baseStats": { "attack": 166, "defense": 196, "stamina": 190 } },
-    "74": { "name": "Geodude", "weight": "20.0", "height": "0.4", "types": ["Rock", "Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 132, "defense": 132, "stamina": 120 } },
-    "75": { "name": "Graveler", "weight": "105.0", "height": "1.0", "types": ["Rock", "Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 164, "defense": 164, "stamina": 146 } },
-    "76": { "name": "Golem", "weight": "300.0", "height": "1.4", "types": ["Rock", "Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 211, "defense": 198, "stamina": 190 } },
-    "77": { "name": "Ponyta", "weight": "30.0", "height": "1.0", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 170, "defense": 127, "stamina": 137 } },
-    "78": { "name": "Rapidash", "weight": "95.0", "height": "1.7", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 207, "defense": 162, "stamina": 163 } },
-    "79": { "name": "Slowpoke", "weight": "36.0", "height": "1.2", "types": ["Water", "Psychic"], "fastMoves": [6, 13], "chargeMoves": [34, 43], "baseStats": { "attack": 109, "defense": 98, "stamina": 207 } },
-    "80": { "name": "Slowbro", "weight": "78.5", "height": "1.6", "types": ["Water", "Psychic"], "fastMoves": [6, 13], "chargeMoves": [34, 43], "baseStats": { "attack": 177, "defense": 180, "stamina": 216 } },
-    "81": { "name": "Magnemite", "weight": "6.0", "height": "0.3", "types": ["Electric", "Steel"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 165, "defense": 121, "stamina": 93 } },
-    "82": { "name": "Magneton", "weight": "60.0", "height": "1.0", "types": ["Electric", "Steel"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 223, "defense": 169, "stamina": 137 } },
-    "83": { "name": "Farfetch'd", "weight": "15.0", "height": "0.8", "types": ["Normal", "Flying"], "fastMoves": [13, 14], "chargeMoves": [43, 44], "baseStats": { "attack": 124, "defense": 115, "stamina": 141 } },
-    "84": { "name": "Doduo", "weight": "39.2", "height": "1.4", "types": ["Normal", "Flying"], "fastMoves": [13, 14], "chargeMoves": [43, 44], "baseStats": { "attack": 158, "defense": 83, "stamina": 111 } },
-    "85": { "name": "Dodrio", "weight": "85.2", "height": "1.8", "types": ["Normal", "Flying"], "fastMoves": [13, 15], "chargeMoves": [43, 45], "baseStats": { "attack": 182, "defense": 150, "stamina": 155 } },
-    "86": { "name": "Seel", "weight": "90.0", "height": "1.1", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 85, "defense": 121, "stamina": 163 } },
-    "87": { "name": "Dewgong", "weight": "120.0", "height": "1.7", "types": ["Water", "Ice"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 139, "defense": 177, "stamina": 207 } },
-    "88": { "name": "Grimer", "weight": "30.0", "height": "0.9", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 135, "defense": 90, "stamina": 190 } },
-    "89": { "name": "Muk", "weight": "30.0", "height": "1.2", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 190, "defense": 172, "stamina": 233 } },
-    "90": { "name": "Shellder", "weight": "4.0", "height": "0.3", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 116, "defense": 134, "stamina": 102 } },
-    "91": { "name": "Cloyster", "weight": "132.5", "height": "1.5", "types": ["Water", "Ice"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 186, "defense": 256, "stamina": 137 } },
-    "92": { "name": "Gastly", "weight": "0.1", "height": "1.3", "types": ["Ghost", "Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 186, "defense": 67, "stamina": 102 } },
-    "93": { "name": "Haunter", "weight": "0.1", "height": "1.6", "types": ["Ghost", "Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 223, "defense": 107, "stamina": 128 } },
-    "94": { "name": "Gengar", "weight": "40.5", "height": "1.5", "types": ["Ghost", "Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 261, "defense": 149, "stamina": 155 } },
-    "95": { "name": "Onix", "weight": "210.0", "height": "8.8", "types": ["Rock", "Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 85, "defense": 232, "stamina": 111 } },
-    "96": { "name": "Drowzee", "weight": "32.4", "height": "1.0", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 89, "defense": 136, "stamina": 155 } },
-    "97": { "name": "Hypno", "weight": "75.6", "height": "1.6", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 144, "defense": 193, "stamina": 198 } },
-    "98": { "name": "Krabby", "weight": "6.5", "height": "0.4", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 181, "defense": 124, "stamina": 102 } },
-    "99": { "name": "Kingler", "weight": "60.0", "height": "1.3", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 240, "defense": 181, "stamina": 146 } },
-    "100": { "name": "Voltorb", "weight": "10.4", "height": "0.5", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 109, "defense": 111, "stamina": 120 } },
-    "101": { "name": "Electrode", "weight": "66.6", "height": "1.2", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 173, "defense": 173, "stamina": 155 } },
-    "102": { "name": "Exeggcute", "weight": "2.5", "height": "0.4", "types": ["Grass", "Psychic"], "fastMoves": [1, 13], "chargeMoves": [26, 43], "baseStats": { "attack": 107, "defense": 125, "stamina": 155 } },
-    "103": { "name": "Exeggutor", "weight": "120.0", "height": "2.0", "types": ["Grass", "Psychic"], "fastMoves": [1, 13], "chargeMoves": [26, 43], "baseStats": { "attack": 233, "defense": 149, "stamina": 216 } },
-    "104": { "name": "Cubone", "weight": "6.5", "height": "0.4", "types": ["Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 90, "defense": 115, "stamina": 137 } },
-    "105": { "name": "Marowak", "weight": "45.0", "height": "1.0", "types": ["Ground"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 144, "defense": 186, "stamina": 155 } },
-    "106": { "name": "Hitmonlee", "weight": "49.8", "height": "1.5", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 215, "defense": 141, "stamina": 137 } },
-    "107": { "name": "Hitmonchan", "weight": "50.2", "height": "1.4", "types": ["Fighting"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 193, "defense": 197, "stamina": 137 } },
-    "108": { "name": "Lickitung", "weight": "65.5", "height": "1.2", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 108, "defense": 137, "stamina": 207 } },
-    "109": { "name": "Koffing", "weight": "1.0", "height": "0.6", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 119, "defense": 141, "stamina": 120 } },
-    "110": { "name": "Weezing", "weight": "9.5", "height": "1.2", "types": ["Poison"], "fastMoves": [17, 13], "chargeMoves": [48, 43], "baseStats": { "attack": 174, "defense": 197, "stamina": 163 } },
-    "111": { "name": "Rhyhorn", "weight": "115.0", "height": "1.0", "types": ["Ground", "Rock"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 140, "defense": 127, "stamina": 190 } },
-    "112": { "name": "Rhydon", "weight": "120.0", "height": "1.9", "types": ["Ground", "Rock"], "fastMoves": [16, 24], "chargeMoves": [24, 25], "baseStats": { "attack": 222, "defense": 171, "stamina": 233 } },
-    "113": { "name": "Chansey", "weight": "34.6", "height": "1.1", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 60, "defense": 128, "stamina": 487 } },
-    "114": { "name": "Tangela", "weight": "35.0", "height": "1.0", "types": ["Grass"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 183, "defense": 169, "stamina": 163 } },
-    "115": { "name": "Kangaskhan", "weight": "80.0", "height": "2.2", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 181, "defense": 165, "stamina": 233 } },
-    "116": { "name": "Horsea", "weight": "8.0", "height": "0.4", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 129, "defense": 103, "stamina": 102 } },
-    "117": { "name": "Seadra", "weight": "25.0", "height": "1.2", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 187, "defense": 156, "stamina": 146 } },
-    "118": { "name": "Goldeen", "weight": "15.0", "height": "0.6", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 123, "defense": 110, "stamina": 128 } },
-    "119": { "name": "Seaking", "weight": "39.0", "height": "1.3", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 175, "defense": 147, "stamina": 190 } },
-    "120": { "name": "Staryu", "weight": "34.5", "height": "0.8", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 137, "defense": 112, "stamina": 102 } },
-    "121": { "name": "Starmie", "weight": "80.0", "height": "1.1", "types": ["Water", "Psychic"], "fastMoves": [6, 13], "chargeMoves": [34, 43], "baseStats": { "attack": 210, "defense": 184, "stamina": 155 } },
-    "122": { "name": "Mr. Mime", "weight": "54.5", "height": "1.3", "types": ["Psychic", "Fairy"], "fastMoves": [13, 20], "chargeMoves": [43, 23], "baseStats": { "attack": 192, "defense": 205, "stamina": 120 } },
-    "123": { "name": "Scyther", "weight": "56.0", "height": "1.5", "types": ["Bug", "Flying"], "fastMoves": [9, 14], "chargeMoves": [38, 44], "baseStats": { "attack": 218, "defense": 170, "stamina": 172 } },
-    "124": { "name": "Jynx", "weight": "40.6", "height": "1.4", "types": ["Ice", "Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 223, "defense": 151, "stamina": 163 } },
-    "125": { "name": "Electabuzz", "weight": "30.0", "height": "1.1", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 198, "defense": 158, "stamina": 163 } },
-    "126": { "name": "Magmar", "weight": "44.5", "height": "1.3", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 206, "defense": 150, "stamina": 163 } },
-    "127": { "name": "Pinsir", "weight": "55.0", "height": "1.5", "types": ["Bug"], "fastMoves": [9, 16], "chargeMoves": [38, 46], "baseStats": { "attack": 238, "defense": 182, "stamina": 163 } },
-    "128": { "name": "Tauros", "weight": "88.4", "height": "1.4", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 198, "defense": 183, "stamina": 181 } },
-    "129": { "name": "Magikarp", "weight": "10.0", "height": "0.9", "types": ["Water"], "fastMoves": [6], "chargeMoves": [34], "baseStats": { "attack": 29, "defense": 85, "stamina": 85 } },
-    "130": { "name": "Gyarados", "weight": "235.0", "height": "6.5", "types": ["Water", "Flying"], "fastMoves": [6, 14], "chargeMoves": [34, 44], "baseStats": { "attack": 237, "defense": 186, "stamina": 216 } },
-    "131": { "name": "Lapras", "weight": "220.0", "height": "2.5", "types": ["Water", "Ice"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 165, "defense": 174, "stamina": 277 } },
-    "132": { "name": "Ditto", "weight": "4.0", "height": "0.3", "types": ["Normal"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 91, "defense": 91, "stamina": 134 } },
-    "133": { "name": "Eevee", "weight": "6.5", "height": "0.3", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 104, "defense": 114, "stamina": 146 } },
-    "134": { "name": "Vaporeon", "weight": "29.0", "height": "1.0", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 205, "defense": 161, "stamina": 277 } },
-    "135": { "name": "Jolteon", "weight": "24.5", "height": "0.8", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 23], "baseStats": { "attack": 232, "defense": 182, "stamina": 163 } },
-    "136": { "name": "Flareon", "weight": "25.0", "height": "0.9", "types": ["Fire"], "fastMoves": [3, 13], "chargeMoves": [30, 31], "baseStats": { "attack": 246, "defense": 179, "stamina": 163 } },
-    "137": { "name": "Porygon", "weight": "36.5", "height": "0.8", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 153, "defense": 136, "stamina": 163 } },
-    "138": { "name": "Omanyte", "weight": "7.5", "height": "0.4", "types": ["Rock", "Water"], "fastMoves": [6, 24], "chargeMoves": [34, 25], "baseStats": { "attack": 155, "defense": 153, "stamina": 111 } },
-    "139": { "name": "Omastar", "weight": "35.0", "height": "1.0", "types": ["Rock", "Water"], "fastMoves": [6, 24], "chargeMoves": [34, 25], "baseStats": { "attack": 207, "defense": 201, "stamina": 172 } },
-    "140": { "name": "Kabuto", "weight": "11.5", "height": "0.5", "types": ["Rock", "Water"], "fastMoves": [6, 24], "chargeMoves": [34, 25], "baseStats": { "attack": 148, "defense": 140, "stamina": 102 } },
-    "141": { "name": "Kabutops", "weight": "40.5", "height": "1.3", "types": ["Rock", "Water"], "fastMoves": [6, 24], "chargeMoves": [34, 25], "baseStats": { "attack": 220, "defense": 186, "stamina": 155 } },
-    "142": { "name": "Aerodactyl", "weight": "59.0", "height": "1.8", "types": ["Rock", "Flying"], "fastMoves": [14, 24], "chargeMoves": [44, 25], "baseStats": { "attack": 221, "defense": 159, "stamina": 190 } },
-    "143": { "name": "Snorlax", "weight": "460.0", "height": "2.1", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 190, "defense": 169, "stamina": 330 } },
-    "144": { "name": "Articuno", "weight": "55.4", "height": "1.7", "types": ["Ice", "Flying"], "fastMoves": [14], "chargeMoves": [44], "baseStats": { "attack": 192, "defense": 236, "stamina": 207 } },
-    "145": { "name": "Zapdos", "weight": "52.6", "height": "1.6", "types": ["Electric", "Flying"], "fastMoves": [20, 14], "chargeMoves": [21, 44], "baseStats": { "attack": 253, "defense": 185, "stamina": 207 } },
-    "146": { "name": "Moltres", "weight": "60.0", "height": "2.0", "types": ["Fire", "Flying"], "fastMoves": [3, 14], "chargeMoves": [30, 44], "baseStats": { "attack": 251, "defense": 181, "stamina": 207 } },
-    "147": { "name": "Dratini", "weight": "3.3", "height": "1.8", "types": ["Dragon"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 119, "defense": 91, "stamina": 120 } },
-    "148": { "name": "Dragonair", "weight": "16.5", "height": "4.0", "types": ["Dragon"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 163, "defense": 135, "stamina": 155 } },
-    "149": { "name": "Dragonite", "weight": "210.0", "height": "2.2", "types": ["Dragon", "Flying"], "fastMoves": [6, 14], "chargeMoves": [34, 44], "baseStats": { "attack": 263, "defense": 198, "stamina": 209 } },
-    "150": { "name": "Mewtwo", "weight": "122.0", "height": "2.0", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 300, "defense": 182, "stamina": 214 } },
-    "151": { "name": "Mew", "weight": "4.0", "height": "0.4", "types": ["Psychic"], "fastMoves": [13], "chargeMoves": [43], "baseStats": { "attack": 210, "defense": 210, "stamina": 225 } }
-  },
-  "moves": {
-    "1": { "name": "Vine Whip", "type": "Grass", "power": 40 },
-    "2": { "name": "Razor Leaf", "type": "Grass", "power": 40 },
-    "3": { "name": "Ember", "type": "Fire", "power": 50 },
-    "4": { "name": "Fire Fang", "type": "Fire", "power": 70 },
-    "5": { "name": "Wing Attack", "type": "Flying", "power": 30 },
-    "6": { "name": "Water Gun", "type": "Water", "power": 30 },
-    "7": { "name": "Bubble", "type": "Water", "power": 30 },
-    "8": { "name": "Waterfall", "type": "Water", "power": 100 },
-    "9": { "name": "Bug Bite", "type": "Bug", "power": 80 },
-    "10": { "name": "Struggle Bug", "type": "Bug", "power": 80 },
-    "11": { "name": "Infestation", "type": "Bug", "power": 10 },
-    "12": { "name": "Poison Jab", "type": "Poison", "power": 10 },
-    "13": { "name": "Quick Attack", "type": "Normal", "power": 50 },
-    "14": { "name": "Peck", "type": "Flying", "power": 60 },
-    "15": { "name": "Air Slash", "type": "Flying", "power": 80 },
-    "16": { "name": "Scratch", "type": "Normal", "power": 60 },
-    "17": { "name": "Acid", "type": "Poison", "power": 90 },
-    "18": { "name": "Bite", "type": "Dark", "power": 60 },
-    "19": { "name": "Spark", "type": "Electric", "power": 60 },
-    "20": { "name": "Thunder Shock", "type": "Electric", "power": 50 },
-    "21": { "name": "Thunderbolt", "type": "Electric", "power": 80 },
-    "22": { "name": "Thunder", "type": "Electric", "power": 100 },
-    "23": { "name": "Zap Cannon", "type": "Electric", "power": 140 },
-    "24": { "name": "Mud-Slap", "type": "Ground", "power": 15 },
-    "25": { "name": "Earthquake", "type": "Ground", "power": 140 },
-    "26": { "name": "Seed Bomb", "type": "Grass", "power": 55 },
-    "27": { "name": "Energy Ball", "type": "Grass", "power": 90 },
-    "28": { "name": "Sludge Bomb", "type": "Poison", "power": 80 },
-    "29": { "name": "Solar Beam", "type": "Grass", "power": 150 },
-    "30": { "name": "Flamethrower", "type": "Fire", "power": 90 },
-    "31": { "name": "Flame Charge", "type": "Fire", "power": 70 },
-    "32": { "name": "Fire Blast", "type": "Fire", "power": 140 },
-    "33": { "name": "Overheat", "type": "Fire", "power": 160 },
-    "34": { "name": "Surf", "type": "Water", "power": 65 },
-    "35": { "name": "Hydro Pump", "type": "Water", "power": 130 },
-    "36": { "name": "Aqua Tail", "type": "Water", "power": 50 },
-    "37": { "name": "Flash Cannon", "type": "Steel", "power": 100 },
-    "38": { "name": "Signal Beam", "type": "Bug", "power": 75 },
-    "39": { "name": "Silver Wind", "type": "Bug", "power": 60 },
-    "40": { "name": "Psychic", "type": "Psychic", "power": 90 },
-    "41": { "name": "X-Scissor", "type": "Bug", "power": 45 },
-    "42": { "name": "Drill Run", "type": "Ground", "power": 80 },
-    "43": { "name": "Swift", "type": "Normal", "power": 60 },
-    "44": { "name": "Aerial Ace", "type": "Flying", "power": 55 },
-    "45": { "name": "Hurricane", "type": "Flying", "power": 110 },
-    "46": { "name": "Hyper Fang", "type": "Normal", "power": 80 },
-    "47": { "name": "Hyper Beam", "type": "Normal", "power": 150 },
-    "48": { "name": "Gunk Shot", "type": "Poison", "power": 130 },
-    "49": { "name": "Wrap", "type": "Normal", "power": 25 },
-    "50": { "name": "Sludge Wave", "type": "Poison", "power": 110 }
-  }
-};
+        gm = {
+          "pokemon": {
+            "1": { "name": "Bulbasaur", "weight": "6.9", "height": "0.7", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 27], "baseStats": { "attack": 118, "defense": 111, "stamina": 128 } },
+            "2": { "name": "Ivysaur", "weight": "13.0", "height": "1.0", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 28], "baseStats": { "attack": 151, "defense": 143, "stamina": 155 } },
+            "3": { "name": "Venusaur", "weight": "100.0", "height": "2.0", "types": ["Grass", "Poison"], "fastMoves": [1, 2], "chargeMoves": [26, 29], "baseStats": { "attack": 198, "defense": 189, "stamina": 190 } },
+            "4": { "name": "Charmander", "weight": "8.5", "height": "0.6", "types": ["Fire"], "fastMoves": [3, 4], "chargeMoves": [30, 31], "baseStats": { "attack": 116, "defense": 93, "stamina": 118 } },
+            "5": { "name": "Charmeleon", "weight": "19.0", "height": "1.1", "types": ["Fire"], "fastMoves": [3, 4], "chargeMoves": [30, 32], "baseStats": { "attack": 158, "defense": 126, "stamina": 151 } },
+            "6": { "name": "Charizard", "weight": "90.5", "height": "1.7", "types": ["Fire", "Flying"], "fastMoves": [3, 5], "chargeMoves": [30, 33], "baseStats": { "attack": 223, "defense": 173, "stamina": 186 } },
+            "7": { "name": "Squirtle", "weight": "9.0", "height": "0.5", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 35], "baseStats": { "attack": 94, "defense": 121, "stamina": 127 } },
+            "8": { "name": "Wartortle", "weight": "22.5", "height": "1.0", "types": ["Water"], "fastMoves": [6, 7], "chargeMoves": [34, 36], "baseStats": { "attack": 126, "defense": 155, "stamina": 153 } },
+            "9": { "name": "Blastoise", "weight": "85.5", "height": "1.6", "types": ["Water"], "fastMoves": [6, 8], "chargeMoves": [34, 37], "baseStats": { "attack": 171, "defense": 207, "stamina": 190 } },
+            "10": { "name": "Caterpie", "weight": "2.9", "height": "0.3", "types": ["Bug"], "fastMoves": [9], "chargeMoves": [38], "baseStats": { "attack": 55, "defense": 55, "stamina": 128 } },
+            "11": { "name": "Metapod", "weight": "9.9", "height": "0.7", "types": ["Bug"], "fastMoves": [9], "chargeMoves": [38], "baseStats": { "attack": 45, "defense": 80, "stamina": 137 } },
+            "12": { "name": "Butterfree", "weight": "32.0", "height": "1.1", "types": ["Bug", "Flying"], "fastMoves": [10, 11], "chargeMoves": [39, 40], "baseStats": { "attack": 167, "defense": 137, "stamina": 155 } },
+            "25": { "name": "Pikachu", "weight": "6.0", "height": "0.4", "types": ["Electric"], "fastMoves": [19, 20], "chargeMoves": [21, 22], "baseStats": { "attack": 112, "defense": 96, "stamina": 111 } },
+            "79": { "name": "Slowpoke", "weight": "36.0", "height": "1.2", "types": ["Water", "Psychic"], "fastMoves": [6, 13], "chargeMoves": [34, 40], "baseStats": { "attack": 109, "defense": 98, "stamina": 207 } },
+            "80": { "name": "Slowbro", "weight": "78.5", "height": "1.6", "types": ["Water", "Psychic"], "fastMoves": [6, 13], "chargeMoves": [34, 40], "baseStats": { "attack": 177, "defense": 180, "stamina": 216 } },
+            "133": { "name": "Eevee", "weight": "6.5", "height": "0.3", "types": ["Normal"], "fastMoves": [13, 16], "chargeMoves": [43, 46], "baseStats": { "attack": 104, "defense": 114, "stamina": 146 } },
+            "147": { "name": "Dratini", "weight": "3.3", "height": "1.8", "types": ["Dragon"], "fastMoves": [13, 16], "chargeMoves": [43, 44], "baseStats": { "attack": 115, "defense": 91, "stamina": 122 } },
+            "148": { "name": "Dragonair", "weight": "16.5", "height": "4.0", "types": ["Dragon"], "fastMoves": [13, 16], "chargeMoves": [43, 45], "baseStats": { "attack": 163, "defense": 135, "stamina": 155 } },
+            "149": { "name": "Dragonite", "weight": "210.0", "height": "2.2", "types": ["Dragon", "Flying"], "fastMoves": [13, 16], "chargeMoves": [43, 45], "baseStats": { "attack": 263, "defense": 198, "stamina": 209 } }
+          },
+          "moves": {
+            "1": { "name": "Vine Whip", "type": "Grass", "power": 40 },
+            "6": { "name": "Water Gun", "type": "Water", "power": 30 },
+            "13": { "name": "Quick Attack", "type": "Normal", "power": 50 },
+            "16": { "name": "Dragon Tail", "type": "Dragon", "power": 60 },
+            "43": { "name": "Twister", "type": "Dragon", "power": 45 },
+            "44": { "name": "Aqua Tail", "type": "Water", "power": 50 },
+            "45": { "name": "Dragon Pulse", "type": "Dragon", "power": 90 }
+          }
+        };
       }
     }
     loadGameMaster();
 
     function generatePokemonData(pokemonId) {
       const pkmn = gm.pokemon[pokemonId];
-      if (!pkmn) return [pokemonId, 2, 2, 2]; 
+      if (!pkmn) return [pokemonId, 13, 43, 44]; 
 
-      const fast = pkmn.fastMoves[Math.floor(Math.random() * pkmn.fastMoves.length)] || 2;
-      let charge1 = pkmn.chargeMoves[Math.floor(Math.random() * pkmn.chargeMoves.length)] || 2;
-      let charge2 = pkmn.chargeMoves[Math.floor(Math.random() * pkmn.chargeMoves.length)] || 2;
+      const fast = pkmn.fastMoves?.[Math.floor(Math.random() * pkmn.fastMoves.length)] || 13;
+      let charge1 = pkmn.chargeMoves?.[Math.floor(Math.random() * pkmn.chargeMoves.length)] || 43;
+      let charge2 = pkmn.chargeMoves?.[Math.floor(Math.random() * pkmn.chargeMoves.length)] || 44;
       
-      if (charge1 === charge2 && pkmn.chargeMoves.length > 1) {
+      if (charge1 === charge2 && pkmn.chargeMoves && pkmn.chargeMoves.length > 1) {
         charge2 = pkmn.chargeMoves.find(m => m !== charge1);
       }
-      return [pokemonId, fast, charge1, charge2]; 
+      return [Number(pokemonId), fast, charge1, charge2]; 
     }
 
     const firebaseConfig = {
@@ -1119,7 +1092,6 @@
 
         document.getElementById('login-overlay').classList.add('hidden');
         document.getElementById('game-hud').classList.add('visible');
-        document.getElementById('user-display').innerText = u;
         document.getElementById('caught-count').innerText = inventory.length;
 
         setTimeout(() => spawn_pokemon(), 800);
@@ -1139,56 +1111,111 @@
       if (activePokemon) { scene.remove(activePokemon.mesh); activePokemon = null; }
     }
 
-    function renderInventory() {
-      const grid = document.getElementById('inventory-grid');
-      grid.innerHTML = '';
-
-      inventory.forEach((pokemonData, index) => {
-        const pokeId = pokemonData[0];
-        const pkmn = gm.pokemon[pokeId] || { name: `Unknown #${pokeId}` };
-        const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokeId}.png`;
-
-        const slot = document.createElement('div');
-        slot.className = 'inventory-slot';
-        slot.innerHTML = `
-          <img src="${spriteUrl}" alt="${pkmn.name}" style="width: 60px; height: 60px;">
-          <span style="font-size: 10px; margin-top: 2px;">${pkmn.name}</span>
-        `;
-        slot.addEventListener('click', () => {
-          document.getElementById('inventory-overlay').classList.add('hidden');
-          openInspection(pokemonData, index);
-        });
-        grid.appendChild(slot);
-      });
-      document.getElementById('inventory-overlay').classList.remove('hidden');
-    }
-
     function openInspection(pokemonData, index) {
       currentlyInspectedIndex = index;
       const [pokeId, m1, m2, m3] = pokemonData;
-      const pkmn = gm.pokemon[pokeId] || { 
-        name: `Unknown #${pokeId}`, weight: '??', height: '??', types: ['???'] 
+      const pokeIdNum = Number(pokeId);
+      const pkmn = gm.pokemon[pokeIdNum] || { 
+        name: `Pokemon #${pokeIdNum}`, weight: '??', height: '??', types: ['Normal'], baseStats: { stamina: '--' } 
       };
       
-      document.getElementById('inspect-model').src = `${pokeId}.glb`;
+      document.getElementById('inspect-model').src = `${pokeIdNum}.glb`;
       document.getElementById('inspect-name').innerText = pkmn.name;
-      document.getElementById('inspect-weight').innerText = `${pkmn.weight}kg`;
-      document.getElementById('inspect-height').innerText = `${pkmn.height}m`;
-      // Example inside your inspection rendering logic:
-      const sta = pkmn.baseStats.stamina; // Or your calculated HP
+      document.getElementById('inspect-weight').innerText = `${pkmn.weight || '??'}kg`;
+      document.getElementById('inspect-height').innerText = `${pkmn.height || '??'}m`;
+      const sta = pkmn.baseStats ? pkmn.baseStats.stamina : '--';
       document.getElementById('inspect-hp').innerText = `${sta} HP`;
+      
       const typesContainer = document.getElementById('inspect-types');
-      typesContainer.innerHTML = pkmn.types.map(t => `<span style="font-size:12px; font-weight:bold; color:#0284c7;">${t}</span>`).join('');
+      typesContainer.innerHTML = (pkmn.types || []).map(t => `<span style="font-size:12px; font-weight:bold; color:#0284c7;">${t}</span>`).join('');
       
       const moves = [m1, m2, m3];
-      moves.forEach((moveId, index) => {
+      moves.forEach((moveId, idx) => {
         const moveData = gm.moves[moveId] || { name: `Move #${moveId}`, type: 'normal', power: '??' };
-        document.getElementById(`move${index+1}-name`).innerText = moveData.name;
-        document.getElementById(`move${index+1}-type`).innerText = moveData.type;
-        document.getElementById(`move${index+1}-power`).innerText = moveData.power;
+        document.getElementById(`move${idx+1}-name`).innerText = moveData.name;
+        document.getElementById(`move${idx+1}-type`).innerText = moveData.type;
+        document.getElementById(`move${idx+1}-power`).innerText = moveData.power;
       });
 
+      const evolveBtn = document.getElementById('evolve-btn');
+      const canEvolve = !finalEvos.has(pokeIdNum);
+
+      if (canEvolve) {
+        evolveBtn.style.display = 'block';
+        const sameSpeciesCount = inventory.filter(p => Number(p[0]) === pokeIdNum).length;
+        if (sameSpeciesCount < 2) {
+          evolveBtn.disabled = true;
+          evolveBtn.innerText = `Evolve (Need 2 ${pkmn.name}s - Have ${sameSpeciesCount})`;
+        } else {
+          evolveBtn.disabled = false;
+          evolveBtn.innerText = `Evolve ${pkmn.name}`;
+        }
+      } else {
+        evolveBtn.style.display = 'none';
+      }
+
       document.getElementById('inspection-overlay').classList.remove('hidden');
+    }
+
+    function handleEvolve() {
+      if (currentlyInspectedIndex === null || currentlyInspectedIndex < 0) return;
+      const currentData = inventory[currentlyInspectedIndex];
+      const pokeId = Number(currentData[0]);
+
+      if (finalEvos.has(pokeId)) return;
+
+      const sameSpecies = inventory.filter(p => Number(p[0]) === pokeId);
+      if (sameSpecies.length < 2) {
+        alert(`You need at least 2 ${gm.pokemon[pokeId]?.name || 'Pokémon'} to evolve (1 to evolve and 1 to transfer).`);
+        return;
+      }
+
+      let nextId = pokeId + 1;
+      if (pokeId === 133) {
+        const eeveeEvos = [134, 135, 136];
+        nextId = eeveeEvos[Math.floor(Math.random() * eeveeEvos.length)];
+      }
+
+      const evolveBtn = document.getElementById('evolve-btn');
+      evolveBtn.disabled = true;
+
+      // Trigger Storm Animation
+      const stormOverlay = document.getElementById('storm-overlay');
+      const lightningFlash = document.getElementById('lightning-flash');
+      const modelViewer = document.getElementById('inspect-model');
+
+      stormOverlay.classList.add('active');
+      modelViewer.style.filter = 'brightness(1.8) drop-shadow(0 0 20px #38bdf8)';
+      modelViewer.style.transform = 'scale(1.15)';
+
+      setTimeout(() => {
+        lightningFlash.classList.add('flash');
+      }, 600);
+
+      setTimeout(() => {
+        // Execute Evolution Data Logic
+        const dupIndex = inventory.findIndex((p, idx) => Number(p[0]) === pokeId && idx !== currentlyInspectedIndex);
+        if (dupIndex !== -1) {
+          inventory.splice(dupIndex, 1);
+          if (dupIndex < currentlyInspectedIndex) {
+            currentlyInspectedIndex--;
+          }
+        }
+
+        const evolvedData = generatePokemonData(nextId);
+        inventory[currentlyInspectedIndex] = evolvedData;
+
+        document.getElementById('caught-count').innerText = inventory.length;
+        if (currentUser && currentPass) update_inventory(currentUser, currentPass, inventory);
+
+        // Reset Effects & Update View
+        stormOverlay.classList.remove('active');
+        lightningFlash.classList.remove('flash');
+        modelViewer.style.filter = 'none';
+        modelViewer.style.transform = 'none';
+
+        openInspection(evolvedData, currentlyInspectedIndex);
+      }, 1800);
     }
 
     function handleTransfer() {
@@ -1208,14 +1235,131 @@
     document.getElementById('action-btn').addEventListener('click', handleSubmit);
     document.getElementById('exit-btn').addEventListener('click', handleLogout);
     document.getElementById('transfer-btn').addEventListener('click', handleTransfer);
+    document.getElementById('evolve-btn').addEventListener('click', handleEvolve);
     
-    document.getElementById('inventory-btn').addEventListener('click', renderInventory);
     document.getElementById('close-inventory-btn').addEventListener('click', () => {
       document.getElementById('inventory-overlay').classList.add('hidden');
     });
     document.getElementById('close-inspection-btn').addEventListener('click', () => {
       document.getElementById('inspection-overlay').classList.add('hidden');
       document.getElementById('inventory-overlay').classList.remove('hidden');
+    });
+
+    const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+    let tradeCallback = null;
+    let selectedTradePokemon = null;
+
+    mqttClient.on('connect', () => {
+      mqttClient.subscribe('pokeworld/trades/#');
+    });
+
+    mqttClient.on('message', (topic, message) => {
+      try {
+        const payload = JSON.parse(message.toString());
+        if (topic === 'pokeworld/trades/offer' && payload.sender !== currentUser) {
+          if (confirm(`Player ${payload.sender} offers ${payload.pokemonName}! Accept trade?`)) {
+            inventory.push(payload.pokemonData);
+            document.getElementById('caught-count').innerText = inventory.length;
+            if (currentUser && currentPass) update_inventory(currentUser, currentPass, inventory);
+            alert('Trade completed successfully!');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to parse trade message:', err);
+      }
+    });
+
+    function selectPokemon(onSelectCallback) {
+      tradeCallback = onSelectCallback;
+      renderInventory(true);
+    }
+
+    function renderInventory(isSelectionMode = false) {
+      const grid = document.getElementById('inventory-grid');
+      grid.innerHTML = '';
+
+      inventory.forEach((pokemonData, index) => {
+        const pokeId = Number(pokemonData[0]);
+        const pkmn = gm.pokemon[pokeId] || { name: `Pokemon #${pokeId}` };
+        const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokeId}.png`;
+
+        const slot = document.createElement('div');
+        slot.className = 'inventory-slot';
+        slot.innerHTML = `
+          <img src="${spriteUrl}" alt="${pkmn.name}" style="width: 60px; height: 60px;">
+          <span style="font-size: 10px; margin-top: 2px;">${pkmn.name}</span>
+        `;
+
+        slot.addEventListener('click', () => {
+          document.getElementById('inventory-overlay').classList.add('hidden');
+          if (isSelectionMode && tradeCallback) {
+            tradeCallback(pokemonData, index);
+            tradeCallback = null;
+          } else {
+            openInspection(pokemonData, index);
+          }
+        });
+        grid.appendChild(slot);
+      });
+
+      document.getElementById('inventory-overlay').classList.remove('hidden');
+    }
+
+    document.getElementById('pokeball-main-btn').addEventListener('click', () => {
+      document.getElementById('action-menu-overlay').classList.remove('hidden');
+    });
+
+    document.getElementById('close-menu-btn').addEventListener('click', () => {
+      document.getElementById('action-menu-overlay').classList.add('hidden');
+    });
+
+    document.getElementById('menu-inventory-btn').addEventListener('click', () => {
+      document.getElementById('action-menu-overlay').classList.add('hidden');
+      renderInventory(false);
+    });
+
+    document.getElementById('menu-trade-btn').addEventListener('click', () => {
+      document.getElementById('action-menu-overlay').classList.add('hidden');
+      document.getElementById('trade-overlay').classList.remove('hidden');
+    });
+
+    document.getElementById('close-trade-btn').addEventListener('click', () => {
+      document.getElementById('trade-overlay').classList.add('hidden');
+    });
+
+    document.getElementById('select-trade-pokemon-btn').addEventListener('click', () => {
+      selectPokemon((pokemonData, index) => {
+        selectedTradePokemon = { data: pokemonData, index: index };
+        const pkmn = gm.pokemon[Number(pokemonData[0])] || { name: 'Pokémon' };
+        document.getElementById('offered-pokemon-name').innerText = pkmn.name;
+        document.getElementById('send-trade-offer-btn').style.display = 'block';
+        document.getElementById('trade-overlay').classList.remove('hidden');
+      });
+    });
+
+    document.getElementById('send-trade-offer-btn').addEventListener('click', () => {
+      if (!selectedTradePokemon) return;
+
+      const pokeId = Number(selectedTradePokemon.data[0]);
+      const pkmn = gm.pokemon[pokeId] || { name: 'Pokémon' };
+
+      const payload = {
+        sender: currentUser,
+        pokemonData: selectedTradePokemon.data,
+        pokemonName: pkmn.name
+      };
+
+      mqttClient.publish('pokeworld/trades/offer', JSON.stringify(payload));
+
+      inventory.splice(selectedTradePokemon.index, 1);
+      document.getElementById('caught-count').innerText = inventory.length;
+      if (currentUser && currentPass) update_inventory(currentUser, currentPass, inventory);
+
+      alert('Trade offer sent to HiveMQ broker!');
+      selectedTradePokemon = null;
+      document.getElementById('offered-pokemon-name').innerText = 'No Pokémon Selected';
+      document.getElementById('send-trade-offer-btn').style.display = 'none';
+      document.getElementById('trade-overlay').classList.add('hidden');
     });
   </script>
 </body>
